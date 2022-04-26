@@ -69,6 +69,87 @@ window.addEventListener("load", function() {
         ujAlaprajzLetrehozasModal.show();
     });
 
+    help('.alaprajz-letoltese').on('click', function() {
+        if (help('#temp-svg-container').length) {
+            help('#temp-svg-container')[0].remove();
+        }
+
+        let svgContent = help('#floorplan-svg-container').html();
+        let divElement = document.createElement('div');
+        divElement.setAttribute("id", "temp-svg-container");
+   //     divElement.setAttribute("style", "width:1920px;height:1080px;visibility:hidden;position:absolute;top:-10000px;left:-10000px");
+
+        help(divElement).htmlAppend(svgContent);
+
+        divElement.getElementsByTagName('svg')[0].id = 'temp-svg';
+
+        document.body.appendChild(divElement);
+        
+        setTimeout(function() {
+
+            let tmpSvgElement = document.getElementById('temp-svg');
+            let svgBoundingClientRect = tmpSvgElement.getBoundingClientRect();
+
+            tmpSvgElement.setAttribute('width', svgBoundingClientRect.width);
+            tmpSvgElement.setAttribute('height', svgBoundingClientRect.height);
+
+            let data = new XMLSerializer().serializeToString(tmpSvgElement);
+            let win = window.URL || window.webkitURL || window;
+            let blob = new Blob([data], {
+                type: 'image/svg+xml'
+            });
+            let url = win.createObjectURL(blob);
+
+            let canvas = document.createElement('canvas');
+            canvas.width = svgBoundingClientRect.width;
+            canvas.height = svgBoundingClientRect.height;
+
+            let img = new Image();
+
+            let fileName = (tmpSvgElement.id || tmpSvgElement.getAttribute('name') || tmpSvgElement.getAttribute('aria-label') || 'untitled');
+
+            img.onload = function () {
+                let ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                if (window.devicePixelRatio > 1) {
+                    let canvasWidth = canvas.width;
+                    let canvasHeight = canvas.height;
+
+                    canvas.width = canvasWidth * window.devicePixelRatio;
+                    canvas.height = canvasHeight * window.devicePixelRatio;
+                    canvas.style.width = canvasWidth + "px";
+                    canvas.style.height = canvasHeight + "px";
+
+                    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                }
+
+                ctx.drawImage(img, 0, 0);
+                win.revokeObjectURL(url);
+                let uri = canvas.toDataURL('image/png').replace('image/png', 'octet/stream');
+
+                let a = document.createElement('a');
+                document.body.appendChild(a);
+                a.style = 'display: none';
+                a.href = uri
+                a.download = fileName + '.png';
+                a.click();
+
+                window.URL.revokeObjectURL(uri);
+                document.body.removeChild(a);
+
+            };
+
+            img.src = url;
+        }, 250);
+
+        // setTimeout(function() {
+        //     ReImg.fromSvg(document.getElementById('temp-svg')).downloadPng();
+        // }, 250);
+    });
+
     help('#ujAlaprajzLetrehozasModal button.btn-primary').on('click', function() {
         if (help('#inputAlaprajzNeve').hasClass('is-invalid')) {
             help('#inputAlaprajzNeve').removeClass('is-invalid');
@@ -144,7 +225,7 @@ window.addEventListener("load", function() {
         help(accordionContainerElement + ' .accordion-collapse').removeClass('show');
         help(accordionContainerElement + ' #accordion-heading' + accordionModeIdSelector(mode) + ' .accordion-button').removeClass('collapsed');
         help(accordionContainerElement + ' #accordion-collapse' + accordionModeIdSelector(mode)).addClass('show');
-    }
+    };
 
     /**
      * Lehetséges szoba-feliratok
@@ -198,6 +279,7 @@ window.addEventListener("load", function() {
 
     /**
      * Popoverek és triggerek törlése
+     * @param obj Aktív hívásról objektum
      */
     let disposeAllPopovers = function(obj) {
 
@@ -245,7 +327,9 @@ window.addEventListener("load", function() {
 
                 let self = this;
 
-                disposeAllPopovers({entity: entity});
+                disposeAllPopovers({
+                    entity: entity
+                });
 
                 try {
 
@@ -352,7 +436,7 @@ window.addEventListener("load", function() {
 
                         let popoverShownHiddenHandler = function (event) {
 
-                            let popover = bootstrap.Popover.getOrCreateInstance(event.target)
+                            let popover = bootstrap.Popover.getOrCreateInstance(event.target);
 
                             help('#entityBox').removeClass("d-none");
 
@@ -390,7 +474,6 @@ window.addEventListener("load", function() {
                                     popover.entity.deleteEntity();
                                     disposeAllPopovers();
                                 } catch (e) {
-                                    console.log(e);
                                     // Revoked Proxy
                                 }
                             };
@@ -439,15 +522,17 @@ window.addEventListener("load", function() {
                     }
 
                 } catch (e) {
-                    console.log(e);
                     // Revoked Proxy
+                    return;
                 }
             },
             wallSelect: function(wall) {
 
                 let self = this;
 
-                disposeAllPopovers({wall: wall});
+                disposeAllPopovers({
+                    wall: wall
+                });
 
                 try {
 
@@ -525,7 +610,7 @@ window.addEventListener("load", function() {
 
                         let popoverShownHiddenHandler = function (event) {
 
-                            let popover = bootstrap.Popover.getOrCreateInstance(event.target)
+                            let popover = bootstrap.Popover.getOrCreateInstance(event.target);
 
                             let meter = self.options.config.meter;
 
@@ -571,7 +656,6 @@ window.addEventListener("load", function() {
 
                         };
 
-
                         centerHandleElementPopoverTrigger.on('shown.bs.popover', popoverShownHiddenHandler);
                         centerHandleElementPopoverTrigger.on('hidden.bs.popover', popoverShownHiddenHandler);
 
@@ -590,8 +674,6 @@ window.addEventListener("load", function() {
 
                         }, 250);
                     }
-
-
 
                 } catch (e) {
                     // Revoked Proxy
@@ -688,7 +770,6 @@ window.addEventListener("load", function() {
                 }, 100);
             },
             deselect: function() {
-
                 help('#wallThickness').off('blur');
                 help('#wallThickness').off('change');
                 help('#wallBox').addClass("d-none");
@@ -706,8 +787,8 @@ window.addEventListener("load", function() {
                     disposeAllPopovers();
                 }
 
-                let undo = help('.undo');
-                let redo = help('.redo');
+                let undo = help('a.undo');
+                let redo = help('a.redo');
 
                 if (this.canUndo()) {
                     undo.removeClass('disabled');
@@ -725,11 +806,11 @@ window.addEventListener("load", function() {
 
                 let self = this;
 
-                help('.undo').on("click", function() {
+                help('a.undo').on("click", function() {
                     self.undo();
                 });
 
-                help('.redo').on("click", function() {
+                help('a.redo').on("click", function() {
                     self.redo();
                 });
 
