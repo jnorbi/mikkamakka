@@ -664,7 +664,7 @@ svgDraw = {
 
             iterationsAvailable--;
 
-            let lastIndexOfCurrentWay = currentWay.length - 1
+            let lastIndexOfCurrentWay = currentWay.length - 1;
 
             // Aktuális csomópont
             let workingVertexId = currentWay[lastIndexOfCurrentWay];
