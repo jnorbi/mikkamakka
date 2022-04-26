@@ -1,3 +1,5 @@
+// 20220426
+
 /**
  * Alaprajz-tervező konstruktor
  * @param options
