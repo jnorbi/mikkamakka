@@ -144,7 +144,7 @@ window.addEventListener("load", function() {
         help(accordionContainerElement + ' .accordion-collapse').removeClass('show');
         help(accordionContainerElement + ' #accordion-heading' + accordionModeIdSelector(mode) + ' .accordion-button').removeClass('collapsed');
         help(accordionContainerElement + ' #accordion-collapse' + accordionModeIdSelector(mode)).addClass('show');
-    };
+    }
 
     /**
      * Lehetséges szoba-feliratok
@@ -198,7 +198,6 @@ window.addEventListener("load", function() {
 
     /**
      * Popoverek és triggerek törlése
-     * @param obj Aktív hívásról objektum
      */
     let disposeAllPopovers = function(obj) {
 
@@ -246,9 +245,7 @@ window.addEventListener("load", function() {
 
                 let self = this;
 
-                disposeAllPopovers({
-                    entity: entity
-                });
+                disposeAllPopovers({entity: entity});
 
                 try {
 
@@ -355,7 +352,7 @@ window.addEventListener("load", function() {
 
                         let popoverShownHiddenHandler = function (event) {
 
-                            let popover = bootstrap.Popover.getOrCreateInstance(event.target);
+                            let popover = bootstrap.Popover.getOrCreateInstance(event.target)
 
                             help('#entityBox').removeClass("d-none");
 
@@ -393,6 +390,7 @@ window.addEventListener("load", function() {
                                     popover.entity.deleteEntity();
                                     disposeAllPopovers();
                                 } catch (e) {
+                                    console.log(e);
                                     // Revoked Proxy
                                 }
                             };
@@ -441,17 +439,15 @@ window.addEventListener("load", function() {
                     }
 
                 } catch (e) {
+                    console.log(e);
                     // Revoked Proxy
-                    return;
                 }
             },
             wallSelect: function(wall) {
 
                 let self = this;
 
-                disposeAllPopovers({
-                    wall: wall
-                });
+                disposeAllPopovers({wall: wall});
 
                 try {
 
@@ -529,7 +525,7 @@ window.addEventListener("load", function() {
 
                         let popoverShownHiddenHandler = function (event) {
 
-                            let popover = bootstrap.Popover.getOrCreateInstance(event.target);
+                            let popover = bootstrap.Popover.getOrCreateInstance(event.target)
 
                             let meter = self.options.config.meter;
 
@@ -575,6 +571,7 @@ window.addEventListener("load", function() {
 
                         };
 
+
                         centerHandleElementPopoverTrigger.on('shown.bs.popover', popoverShownHiddenHandler);
                         centerHandleElementPopoverTrigger.on('hidden.bs.popover', popoverShownHiddenHandler);
 
@@ -593,6 +590,8 @@ window.addEventListener("load", function() {
 
                         }, 250);
                     }
+
+
 
                 } catch (e) {
                     // Revoked Proxy
@@ -689,6 +688,7 @@ window.addEventListener("load", function() {
                 }, 100);
             },
             deselect: function() {
+
                 help('#wallThickness').off('blur');
                 help('#wallThickness').off('change');
                 help('#wallBox').addClass("d-none");
@@ -706,8 +706,8 @@ window.addEventListener("load", function() {
                     disposeAllPopovers();
                 }
 
-                let undo = help('a.undo');
-                let redo = help('a.redo');
+                let undo = help('.undo');
+                let redo = help('.redo');
 
                 if (this.canUndo()) {
                     undo.removeClass('disabled');
@@ -725,11 +725,11 @@ window.addEventListener("load", function() {
 
                 let self = this;
 
-                help('a.undo').on("click", function() {
+                help('.undo').on("click", function() {
                     self.undo();
                 });
 
-                help('a.redo').on("click", function() {
+                help('.redo').on("click", function() {
                     self.redo();
                 });
 
