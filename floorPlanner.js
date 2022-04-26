@@ -4,6 +4,9 @@
  * @constructor
  */
 FloorPlanner = function (options) {
+
+    let self = this;
+
     /**
      * 1 méter hány pixel
      * @type {number}
@@ -574,7 +577,7 @@ FloorPlanner.prototype.initVariables = function() {
      * Viewport szélessége
      * @type {number}
      */
-    this.viewportWidth = this.floorplanWidth;
+    this.viewportWidth = this.floorplanWidth
 
     /**
      * Viewport magassága
@@ -1067,7 +1070,7 @@ FloorPlanner.prototype.setModeOptions = function(modeOptions, extend = true)
         // Fal rajzolása
         case 'wallDrawingMode':
             dataAttrCheck = 'thickness';
-            dataAttrCheckValue = this.modeOptions.wall.thickness;
+            dataAttrCheckValue = this.modeOptions.wall.thickness
             break;
     }
 
@@ -2040,7 +2043,7 @@ FloorPlanner.prototype.drawWalls = function() {
  */
 FloorPlanner.prototype.drawRooms = function() {
 
-    this.rooms = [];
+    this.rooms = []
 
     let polygons = this.identifyPolygons();
 
@@ -3225,7 +3228,6 @@ FloorPlanner.prototype.polygonRegardingLineThickness = function(vertexList, way)
  * @returns {*[]}
  */
 FloorPlanner.prototype.identifyPolygons = function() {
-    let self = this;
 
     // Kiinduló csomópontok listája
     let vertexList = svgDraw.vertexList(this.walls);
@@ -3244,7 +3246,7 @@ FloorPlanner.prototype.identifyPolygons = function() {
     // Síkidomok tömbje
     let polygons = [];
 
-    edges.forEach(function() {
+    for (let i in edges) {
         // Ahány irányított él van, annyiszor futunk neki az egész gráfnak
 
         // Az első nem bejárt csúcshoz képest hasonlítsuk a többit
@@ -3258,7 +3260,7 @@ FloorPlanner.prototype.identifyPolygons = function() {
 
         if (!startingVertex) {
             // Minden csúcs be van járva
-            return;
+            break;
         }
 
         // Az aktuálisan megmaradt gráfból a bal felső csúcs
@@ -3293,7 +3295,7 @@ FloorPlanner.prototype.identifyPolygons = function() {
                 });
             }
 
-            let coordinatesRegardingLineThickness = self.polygonRegardingLineThickness(vertexList, way);
+            let coordinatesRegardingLineThickness = this.polygonRegardingLineThickness(vertexList, way);
 
             polygons.push({
                 way: way,
@@ -3337,7 +3339,7 @@ FloorPlanner.prototype.identifyPolygons = function() {
             } while (search);
         }
 
-    });
+    }
 
     return polygons;
 };
@@ -3467,7 +3469,7 @@ FloorPlanner.prototype.entityGraphics = function (group, kind, look, entityWidth
             });
 
             return graphicsArray;
-        };
+        }
 
         if (kind === 'door') {
             // ajtók
@@ -3645,7 +3647,7 @@ FloorPlanner.prototype.makeEntity = function(entityOptions) {
             let handleGraphAttributes = self.extend(true, entityGraphics.graphicsArray[i].attributes, {
                 fill: self.options.config.entity.handleFillColor,
                 stroke: self.options.config.entity.handleStrokeColor,
-            });
+            })
 
             if (updateGraph) {
 
@@ -3744,7 +3746,7 @@ FloorPlanner.prototype.makeEntity = function(entityOptions) {
             boundingBox.origin = entity.coordinates;
             return boundingBox;
         }
-    });
+    })
 
     /**
      * Befoglaló poligon
