@@ -81,17 +81,6 @@
     }
 
     /**
-     * queryPair
-     * URL encoded Query String key=value pair
-     * @param name
-     * @param value
-     * @returns {string}
-     */
-    function queryPair(name, value) {
-        return encodeURIComponent(name).replace(/%20/g, '+') + '=' + encodeURIComponent(value).replace(/%20/g, '+');
-    }
-
-    /**
      * CSS set
      * @param elm
      * @param property
@@ -433,21 +422,26 @@
          * @returns {*}
          */
         collection.getClass = function () {
+            let className = '';
+
             if (nodes[0]) {
                 if (typeof nodes[0].className == 'object') {
                     if (nodes[0].className.baseVal.length > 0) {
-                        let className = nodes[0].className.baseVal;
+                        className = nodes[0].className.baseVal;
                     }
                 } else {
                     if (nodes[0].className.length > 0) {
-                        let className = nodes[0].className;
+                        className = nodes[0].className;
                     }
                 }
             }
-            if (typeof className != 'undefined') {
+
+            if (className != '') {
                 // IE trim :D
                 return className.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '').replace(/\s+/,' ');
             }
+
+            return className;
         };
 
         /**
