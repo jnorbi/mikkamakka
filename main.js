@@ -9,7 +9,7 @@ window.addEventListener("load", function() {
      * FloorPlanner objektum
      * @type {FloorPlanner}
      */
-    floorPlanner = new FloorPlanner({
+    let floorPlanner = new FloorPlanner({
         callbacks: {
             entitySelect: function(entity) {
 
