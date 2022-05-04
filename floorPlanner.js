@@ -253,6 +253,11 @@ FloorPlanner = function (options) {
                  */
                 handleFillColor: '#e2e5ff',
 
+                /**
+                 * Szöveg színe
+                 */
+                textColor: '#333333',
+
             },
 
             /**
@@ -453,7 +458,7 @@ FloorPlanner.prototype.initEventHandlers = function() {
     );
     let scrollFunction = function(event) {
         event.preventDefault();
-        self.adjustZoom((event.detail < 0) ? 'zoomIn' : (event.wheelDelta > 0) ? 'zoomIn' : 'zoomOut');
+        self.adjustZoom((event.detail < 0) ? 'zoomIn' : (event.wheelDelta > 0) ? 'zoomIn' : 'zoomOut', event);
     };
     help(self.options.config.floorplanElementSelector).on('mousewheel', scrollFunction);
     help(self.options.config.floorplanElementSelector).on('DOMMouseScroll', scrollFunction);
@@ -610,15 +615,6 @@ FloorPlanner.prototype.initVariables = function() {
     };
 
     /**
-     * Aktuális egérpozíció
-     * @type {{x: number, y: number}}
-     */
-    this.currentMousePosition = {
-        x: 0,
-        y: 0
-    };
-
-    /**
      * Zoom értéke
      * @type {number}
      */
@@ -641,17 +637,6 @@ FloorPlanner.prototype.initVariables = function() {
      * @type {boolean}
      */
     this.snapToGrid = true;
-
-    let floorplanElementBoundingClientRect = help(this.options.config.floorplanElementSelector)[0].getBoundingClientRect();
-
-    /**
-     * Rajzvászon befoglalójának ofszetje
-     * @type {{top: *, left: *}}
-     */
-    this.offset = {
-        top: floorplanElementBoundingClientRect.top + document.body.scrollTop,
-        left: floorplanElementBoundingClientRect.left + document.body.scrollLeft
-    };
 
     // Default cursor: rajzvászon mozgatása
     this.cursor('move');
@@ -748,6 +733,20 @@ FloorPlanner.prototype.initVariables = function() {
         }
     });
 
+    /**
+     * Rajzvászon befoglalójának ofszetje
+     * @type {{top: *, left: *}}
+     */
+    Object.defineProperty(this, 'offset', {
+        get: function() {
+            let floorplanElementBoundingClientRect = help(this.options.config.floorplanElementSelector)[0].getBoundingClientRect();
+            return {
+                top: floorplanElementBoundingClientRect.top + document.body.scrollTop,
+                left: floorplanElementBoundingClientRect.left + document.body.scrollLeft
+            }
+        }
+    });
+
     this.initDimensions();
 
 };
@@ -815,6 +814,8 @@ FloorPlanner.prototype.reset = function (withHistory = false) {
     help(this.options.config.entity.tmpEntityContainerElement).empty();
     help(this.options.config.entity.entityContainerElement).empty();
 
+    help(this.options.config.wallDrawingContainerElement)[0].classList.add('d-none');
+
     if (withHistory) {
         this.history = [];
     }
@@ -852,7 +853,11 @@ FloorPlanner.prototype.fromJSON = function(json) {
         let copy = JSON.parse(json);
 
         // Metaadatok betöltése
-        this.meta = copy.meta;
+        if (copy.meta) {
+            this.meta = copy.meta;
+        } else {
+            this.meta = {};
+        }
 
         // Falak betöltése
         for (let i in copy.walls) {
@@ -1389,7 +1394,7 @@ FloorPlanner.prototype.redo = function() {
  * Rajzvászon zoom
  * @param zoom
  */
-FloorPlanner.prototype.setZoom = function(zoom) {
+FloorPlanner.prototype.setZoom = function(zoom, event) {
 
     // Ha a HTML-ből string jönne, nem éppen összeadást csinálna a + amikor növelni kell az értékét :)
     zoom = parseInt(zoom);
@@ -1406,15 +1411,22 @@ FloorPlanner.prototype.setZoom = function(zoom) {
 
     if (step) {
 
+        let oldViewportWidth = this.viewportWidth;
+        let oldViewportHeight = this.viewportHeight;
+
         let newViewportWidth = this.viewportWidth - step;
         let newViewportHeight = this.viewportHeight - step / this.floorplanWidthHeightRatio;
 
-        let mousePosition = this.currentMousePosition;
+        if (event) {
 
-        this.viewportOrigin = {
-            x: mousePosition.x - (mousePosition.x - this.viewportOrigin.x) * newViewportWidth  / this.viewportWidth,
-            y: mousePosition.y - (mousePosition.y - this.viewportOrigin.y) * newViewportHeight / this.viewportHeight,
-        };
+            let mousePosition = this.getEventCoordinates(event);
+
+            this.viewportOrigin = {
+                x: mousePosition.x - newViewportWidth * (mousePosition.x - this.viewportOrigin.x)  / oldViewportWidth,
+                y: mousePosition.y - newViewportHeight * (mousePosition.y - this.viewportOrigin.y)  / oldViewportHeight,
+            };
+
+        }
 
         this.viewportWidth = newViewportWidth;
         this.viewportHeight = newViewportHeight;
@@ -1445,6 +1457,8 @@ FloorPlanner.prototype.setZoom = function(zoom) {
     // Rajzvászon alap méretezése
     this.initDimensions();
 
+    this.renderFloorplan();
+
     if (this.options.callbacks.zoom && this.options.callbacks.zoom instanceof Function) {
         this.options.callbacks.zoom.call(this);
     }
@@ -1471,16 +1485,16 @@ FloorPlanner.prototype.cursor = function(tool) {
  * Rajzvászon zoom ki/be/reset
  * @param mode
  */
-FloorPlanner.prototype.adjustZoom = function(mode) {
+FloorPlanner.prototype.adjustZoom = function(mode, event) {
     switch (mode) {
         case 'zoomOut':
-            this.setZoom(this.zoom - 1);
+            this.setZoom(this.zoom - 1, event);
             break;
         case 'zoomIn':
-            this.setZoom(this.zoom + 1);
+            this.setZoom(this.zoom + 1, event);
             break;
         case 'resetZoom':
-            this.setZoom(this.options.config.zoom.defaultZoom)
+            this.setZoom(this.options.config.zoom.defaultZoom, event)
             break;
     }
 };
@@ -1526,7 +1540,6 @@ FloorPlanner.prototype.moveCanvas = function(moveDirection, moveStep) {
 FloorPlanner.prototype.getEventCoordinates = function(event) {
 
     let eventX, eventY;
-    let mouseX, mouseY;
 
     if (event.touches) {
         let touches = event.changedTouches;
@@ -1537,14 +1550,16 @@ FloorPlanner.prototype.getEventCoordinates = function(event) {
         eventY = event.pageY;
     }
 
-    mouseX = (eventX * this.factor) - (this.offset.left * this.factor) + this.viewportOrigin.x;
-    mouseY = (eventY * this.factor) - (this.offset.top * this.factor) + this.viewportOrigin.y;
+    let mouseCoordinates = this.offsetCoordinates({
+        x: eventX,
+        y: eventY,
+    });
 
     return {
-        x: this.snapToGrid ? Math.round(mouseX / this.options.config.snapGridSize) * this.options.config.snapGridSize : mouseX,
-        y: this.snapToGrid ? Math.round(mouseY / this.options.config.snapGridSize) * this.options.config.snapGridSize : mouseY,
-        mouseX: mouseX,
-        mouseY: mouseY
+        x: this.snapToGrid ? Math.round(mouseCoordinates.x / this.options.config.snapGridSize) * this.options.config.snapGridSize : mouseCoordinates.x,
+        y: this.snapToGrid ? Math.round(mouseCoordinates.y / this.options.config.snapGridSize) * this.options.config.snapGridSize : mouseCoordinates.y,
+        mouseX: mouseCoordinates.x,
+        mouseY: mouseCoordinates.y
     };
 };
 
@@ -2450,8 +2465,9 @@ FloorPlanner.prototype.getWallsByEndpoints = function(coordinates, range = 30, e
 
     let found = [];
 
-    for (let i = 0; i < this.walls.length; i++) {
-        if (excludeWallIndices.indexOf(this.walls[i]) === -1) {
+    for (let i in this.walls) {
+
+        if (!excludeWallIndices.includes(this.walls[i].index)) {
             // Nem kihagyandó fal
 
             let distance;
@@ -2510,7 +2526,10 @@ FloorPlanner.prototype.setHandleOnHover = function(event) {
             idElements = event.target.id.split('-');
         } else {
             // A target egy SVG path, rect, stb, a szülőjén van feldolgozható id
-            idElements = help(event.target)[0].parentElement.id.split('-');
+            let parentElement = help(event.target)[0].parentElement;
+            if (parentElement) {
+                idElements = parentElement.id.split('-');
+            }
         }
 
         if (idElements) {
@@ -2601,13 +2620,6 @@ FloorPlanner.prototype.mouseDown = function(event) {
  * @param event
  */
 FloorPlanner.prototype.mouseMove = function(event) {
-
-    let coordinates = this.getEventCoordinates(event);
-    this.currentMousePosition = {
-        x: coordinates.mouseX,
-        y: coordinates.mouseY,
-    };
-
     event.preventDefault();
     switch (this.mode) {
         case 'selectMode':
@@ -2781,6 +2793,17 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
             // Fal mozgatása
             let newStart = svgDraw.calculateIntersection(startBoundaryEquation, movedWallBaseEquation);
             let newEnd = svgDraw.calculateIntersection(movedWallBaseEquation, endBoundaryEquation);
+
+            // Kerekítés
+            newStart = {
+                x: Math.round(newStart.x),
+                y: Math.round(newStart.y)
+            };
+
+            newEnd = {
+                x: Math.round(newEnd.x),
+                y: Math.round(newEnd.y),
+            };
 
             let allEntitiesOk = true;
             let entitiesToUpdate = [];
@@ -3244,8 +3267,9 @@ FloorPlanner.prototype.identifyPolygons = function() {
     // Síkidomok tömbje
     let polygons = [];
 
-    edges.forEach(function() {
-        // Ahány irányított él van, annyiszor futunk neki az egész gráfnak
+    let iterations = edges.length;
+    // Ahány irányított él van, annyiszor futunk neki az egész gráfnak
+    for (let i = 0; i < iterations; i++) {
 
         // Az első nem bejárt csúcshoz képest hasonlítsuk a többit
         let startingVertex;
@@ -3258,7 +3282,7 @@ FloorPlanner.prototype.identifyPolygons = function() {
 
         if (!startingVertex) {
             // Minden csúcs be van járva
-            return;
+            break;
         }
 
         // Az aktuálisan megmaradt gráfból a bal felső csúcs
@@ -3337,7 +3361,7 @@ FloorPlanner.prototype.identifyPolygons = function() {
             } while (search);
         }
 
-    });
+    };
 
     return polygons;
 };
@@ -3520,10 +3544,12 @@ FloorPlanner.prototype.entityGraphics = function (group, kind, look, entityWidth
                 let textAttributes = {
                     x: 0,
                     y: 0,
-                    fontSize: '12',
-                    stroke: 'black',
+                    'font-size': '24',
+                    'font-family': 'inherit',
+                    'font-weight': 'normal',
+                    stroke: 'none',
                     'text-anchor': 'middle',
-                    fill: 'black',
+                    fill: this.options.config.entity.textColor,
                 };
 
                 // Szövegdoboz méreteinek meghatározása
@@ -3596,6 +3622,89 @@ FloorPlanner.prototype.entitiesOfWall = function(wall) {
         }
     }
     return entities;
+};
+
+/**
+ * Tényleges tartalom befoglaló méretei
+ * @param marginX
+ * @param marginY
+ * @returns {{coordinates: {x: number, y: number}, width: number, height: number}}
+ */
+FloorPlanner.prototype.getRealContentDimensions = function(marginX = 0, marginY = 0) {
+
+    let xArray = [];
+    let yArray = [];
+
+    let calculateMinMax = function (coordinates) {
+        xArray.push(coordinates.x);
+        yArray.push(coordinates.y);
+    };
+
+    for (let i in this.walls) {
+        for (let j in this.walls[i].coordinates) {
+            calculateMinMax(this.walls[i].coordinates[j]);
+        }
+    }
+
+    for (let i in this.entities) {
+        for (let j in this.entities[i].edgesPolygon) {
+            calculateMinMax(this.entities[i].edgesPolygon[j]);
+        }
+    }
+
+    let minX = Math.min.apply(null, xArray);
+    let maxX = Math.max.apply(null, xArray);
+
+    let minY = Math.min.apply(null, yArray);
+    let maxY = Math.max.apply(null, yArray);
+
+    minX = minX - marginX;
+    minY = minY - marginY;
+
+    maxX += marginX;
+    maxY += marginY;
+
+    /*
+    this.debugPolygon([
+        {
+            x: minX,
+            y: minY
+        },
+        {
+            x: maxX,
+            y: minY
+        },
+        {
+            x: maxX,
+            y: maxY
+        },
+        {
+            x: minX,
+            y: maxY
+        }
+    ]);
+    */
+
+    return {
+        coordinates: {
+            x: minX,
+            y: minY
+        },
+        width: maxX - minX,
+        height: maxY - minY,
+    };
+};
+
+/**
+ * Relatív koordináták ofszetelése
+ * @param coordinates
+ * @returns {{x: number, y: number}}
+ */
+FloorPlanner.prototype.offsetCoordinates = function(coordinates) {
+    return {
+        x: (coordinates.x * this.factor) - (this.offset.left * this.factor) + this.viewportOrigin.x,
+        y: (coordinates.y * this.factor) - (this.offset.top * this.factor) + this.viewportOrigin.y,
+    };
 };
 
 /**
@@ -3738,9 +3847,11 @@ FloorPlanner.prototype.makeEntity = function(entityOptions) {
      */
     Object.defineProperty(entity, 'boundingBox', {
         get: function() {
+            this.update();
             let boundingBox = entity.graph.getBoundingClientRect();
-            boundingBox.x = self.viewportOrigin.x + boundingBox.x * self.factor - self.offset.left * self.factor;
-            boundingBox.y = self.viewportOrigin.y + boundingBox.y * self.factor - self.offset.top  * self.factor;
+            let offsetCoordinates = self.offsetCoordinates(boundingBox);
+            boundingBox.x = offsetCoordinates.x;
+            boundingBox.y = offsetCoordinates.y;
             boundingBox.origin = entity.coordinates;
             return boundingBox;
         }
@@ -3751,23 +3862,41 @@ FloorPlanner.prototype.makeEntity = function(entityOptions) {
      */
     Object.defineProperty(entity, 'boundingBoxPolygon', {
         get: function() {
-            let boundingBox = entity.boundingBox;
+
+            let xArray = [];
+            let yArray = [];
+
+            let calculateMinMax = function (coordinates) {
+                xArray.push(coordinates.x);
+                yArray.push(coordinates.y);
+            };
+
+            for (let i in this.edgesPolygon) {
+                calculateMinMax(this.edgesPolygon[i]);
+            }
+
+            let minX = Math.min.apply(null, xArray);
+            let maxX = Math.max.apply(null, xArray);
+
+            let minY = Math.min.apply(null, yArray);
+            let maxY = Math.max.apply(null, yArray);
+
             return [
                 {
-                    x: boundingBox.x,
-                    y: boundingBox.y
+                    x: minX,
+                    y: minY
                 },
                 {
-                    x: boundingBox.x + boundingBox.width,
-                    y: boundingBox.y
+                    x: maxX,
+                    y: minY
                 },
                 {
-                    x: boundingBox.x + boundingBox.width,
-                    y: boundingBox.y + boundingBox.height
+                    x: maxX,
+                    y: maxY
                 },
                 {
-                    x: boundingBox.x,
-                    y: boundingBox.y + boundingBox.height
+                    x: minX,
+                    y: maxY
                 }
             ];
         }
@@ -3778,25 +3907,41 @@ FloorPlanner.prototype.makeEntity = function(entityOptions) {
      */
     Object.defineProperty(entity, 'edgesPolygon', {
         get: function() {
-            let angleRad = svgDraw.degToRad(entity.angleDeg);
-            return [
+
+            let bBox = entity.graph.getBBox();
+
+            bBox.x += entity.coordinates.x;
+            bBox.y += entity.coordinates.y;
+
+            let bBoxPolygon = [
                 {
-                    x: entity.coordinates.x + entity.entityWidth/2  * Math.cos(angleRad) - entity.entityHeight/2 * Math.sin(angleRad),
-                    y: entity.coordinates.y + entity.entityHeight/2 * Math.cos(angleRad) + entity.entityWidth/2  * Math.sin(angleRad),
+                    x: bBox.x,
+                    y: bBox.y
                 },
                 {
-                    x: entity.coordinates.x - entity.entityWidth/2  * Math.cos(angleRad) - entity.entityHeight/2 * Math.sin(angleRad),
-                    y: entity.coordinates.y + entity.entityHeight/2 * Math.cos(angleRad) - entity.entityWidth/2  * Math.sin(angleRad),
+                    x: bBox.x + bBox.width,
+                    y: bBox.y
                 },
                 {
-                    x: entity.coordinates.x - entity.entityWidth/2  * Math.cos(angleRad) + entity.entityHeight/2 * Math.sin(angleRad),
-                    y: entity.coordinates.y - entity.entityHeight/2 * Math.cos(angleRad) - entity.entityWidth/2  * Math.sin(angleRad),
+                    x: bBox.x + bBox.width,
+                    y: bBox.y + bBox.height
                 },
                 {
-                    x: entity.coordinates.x + entity.entityWidth/2  * Math.cos(angleRad) + entity.entityHeight/2 * Math.sin(angleRad),
-                    y: entity.coordinates.y - entity.entityHeight/2 * Math.cos(angleRad) + entity.entityWidth/2  * Math.sin(angleRad),
+                    x: bBox.x,
+                    y: bBox.y + bBox.height
                 }
             ];
+
+            let angleRad = svgDraw.degToRad(entity.angleDeg);
+
+            let rotatedPolygon = [];
+
+            for (let i in bBoxPolygon) {
+                rotatedPolygon[i] = svgDraw.rotatePointAroundCoordinates(entity.coordinates, angleRad, bBoxPolygon[i]);
+            }
+
+            return rotatedPolygon;
+
         }
     });
 
