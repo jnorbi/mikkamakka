@@ -646,7 +646,7 @@ window.addEventListener("load", function() {
 
         setTimeout(function() {
 
-            help(tmpSvgElement).attr('width', realContentDimensions.width)
+            help(tmpSvgElement).attr('width', realContentDimensions.width);
             help(tmpSvgElement).attr('height', realContentDimensions.height);
             help(tmpSvgElement).attr('viewBox', realContentDimensions.coordinates.x + ' ' + realContentDimensions.coordinates.y + ' ' + realContentDimensions.width + ' ' + realContentDimensions.height);
 
