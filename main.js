@@ -38,7 +38,7 @@ window.addEventListener("load", function() {
                             centerHandleElement.remove();
                         }
 
-                        let entityBoundingBoxPolygon = entity.boundingBoxPolygon;
+                        let entityBoundingBoxPolygon = entity.edgesPolygon;
                         let centerCoords = svgDraw.middle(entityBoundingBoxPolygon[2], entityBoundingBoxPolygon[3]);
 
                         let deleteButtonTitle = 'Törlés';
@@ -515,6 +515,8 @@ window.addEventListener("load", function() {
         }
     });
 
+    window.floorPlanner = floorPlanner;
+
     let defaultModalOptions = {
         keyboard: false,
         backdrop: 'static'
@@ -585,31 +587,68 @@ window.addEventListener("load", function() {
     help('.alaprajz-letoltese').on('click', function() {
 
         let tmpElementId = 'temp-svg-container';
+        let tmpIdPrefix = 'tmpsvg-';
 
         if (help('#' + tmpElementId).length) {
             help('#' + tmpElementId)[0].remove();
         }
 
+        // Bizonyos elemek kidobása a tmpElement-ből
+        let toRemoveIdArray = [
+            'boxgrid',
+            floorPlanner.options.config.wall.tmpWallContainerElementId,
+            floorPlanner.options.config.entity.tmpEntityContainerElementId,
+            floorPlanner.options.config.debugMode.debugContainerElementId,
+        ];
+
         let boxGridElement = help('#boxgrid')[0];
         let boxGridBoundingClientRect = boxGridElement.getBoundingClientRect();
 
         let tmpSvgElement = help(floorPlanner.options.config.floorplanElementSelector)[0].cloneNode(true);
+        tmpSvgElement.id = tmpIdPrefix + tmpSvgElement.id;
+        let tmpSvgElementChildren = help(tmpSvgElement).children();
 
-        let divElement = document.createElement('div', {
+        // Ne legyenek duplikált id-k és nem szükséges elemek törlése
+        for (let i in tmpSvgElementChildren) {
+            if (tmpSvgElementChildren[i][0].id) {
+                tmpSvgElementChildren[i][0].id = tmpIdPrefix + tmpSvgElementChildren[i][0].id;
+                for (let j in toRemoveIdArray) {
+                    if (tmpIdPrefix + toRemoveIdArray[j] === tmpSvgElementChildren[i][0].id) {
+                        tmpSvgElementChildren[i].remove();
+                    }
+                }
+            }
+        }
+
+        // Alaprajz lényegi tartalmi elemei
+        let realContentDimensions = floorPlanner.getRealContentDimensions(20, 20);
+
+        let tmpElement = document.createElement('div', {
             width: boxGridBoundingClientRect.width,
             height: boxGridBoundingClientRect.height,
         });
-        divElement.id = tmpElementId;
 
-        // style: "position:absolute;top:0;left:0;background:red;z-index:30",
-        help(divElement).appendChild(tmpSvgElement);
-        document.body.appendChild(divElement);
+        tmpElement.id = tmpElementId;
+        help(tmpElement).appendChild(tmpSvgElement);
+        help(tmpElement).addClass('d-none');
+        document.body.appendChild(tmpElement);
+
+        // Vízjel
+        help('#' + tmpIdPrefix + 'icom-logo-image').attr('x', realContentDimensions.coordinates.x);
+        help('#' + tmpIdPrefix + 'icom-logo-image').attr('y', realContentDimensions.coordinates.y);
+        help('#' + tmpIdPrefix + 'icom-logo-image').removeClass('d-none');
+
+        // Méretezés
+        let scale = 2;
+
+        // Device Pixel Ratio
+        let devicePixelRatio = window.devicePixelRatio || 1;
 
         setTimeout(function() {
 
-            help(tmpSvgElement).attr('width', boxGridBoundingClientRect.width)
-            help(tmpSvgElement).attr('height', boxGridBoundingClientRect.height);
-            help(tmpSvgElement).attr('viewBox', 0 + ' ' + 0 + ' ' + boxGridBoundingClientRect.width + ' ' + boxGridBoundingClientRect.height);
+            help(tmpSvgElement).attr('width', realContentDimensions.width);
+            help(tmpSvgElement).attr('height', realContentDimensions.height);
+            help(tmpSvgElement).attr('viewBox', realContentDimensions.coordinates.x + ' ' + realContentDimensions.coordinates.y + ' ' + realContentDimensions.width + ' ' + realContentDimensions.height);
 
             let data = new XMLSerializer().serializeToString(tmpSvgElement);
             let win = window.URL || window.webkitURL || window;
@@ -618,46 +657,40 @@ window.addEventListener("load", function() {
             });
 
             let canvas = document.createElement('canvas');
-            let realContentDimensions = floorPlanner.getRealContentDimensions(20,20);
 
-            canvas.width = realContentDimensions.width;
-            canvas.height = realContentDimensions.height;
+            canvas.width = realContentDimensions.width * scale * devicePixelRatio;
+            canvas.height = realContentDimensions.height * scale * devicePixelRatio;
+
+            canvas.style.width = (realContentDimensions.width * scale) + "px";
+            canvas.style.height = (realContentDimensions.height * scale) + "px";
 
             let img = new Image();
             let url = win.createObjectURL(blob);
             img.src = url;
 
-            let fileName = (tmpSvgElement.id || tmpSvgElement.getAttribute('name') || tmpSvgElement.getAttribute('aria-label') || 'untitled');
+            let fileName = floorPlanner.meta.title || tmpSvgElement.id || tmpSvgElement.getAttribute('name') || tmpSvgElement.getAttribute('aria-label') || 'untitled';
+            fileName += ' ingatlan.com alaprajz';
 
             img.onload = function () {
+
                 let ctx = canvas.getContext('2d');
+
+                ctx.scale(devicePixelRatio, devicePixelRatio);
 
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 ctx.drawImage(
                     img,
-                    realContentDimensions.coordinates.x,
-                    realContentDimensions.coordinates.y,
-                    realContentDimensions.width,
-                    realContentDimensions.height,
                     0,
                     0,
                     realContentDimensions.width,
                     realContentDimensions.height,
+                    0,
+                    0,
+                    realContentDimensions.width * scale,
+                    realContentDimensions.height * scale,
                 );
-
-                if (window.devicePixelRatio > 1) {
-                    let canvasWidth = canvas.width;
-                    let canvasHeight = canvas.height;
-
-                    canvas.width = canvasWidth * window.devicePixelRatio;
-                    canvas.height = canvasHeight * window.devicePixelRatio;
-                    canvas.style.width = canvasWidth + "px";
-                    canvas.style.height = canvasHeight + "px";
-
-                    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                }
 
                 win.revokeObjectURL(url);
                 let uri = canvas.toDataURL('image/png').replace('image/png', 'octet/stream');
