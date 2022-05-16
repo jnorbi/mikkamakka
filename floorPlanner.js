@@ -3540,7 +3540,7 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
  */
 FloorPlanner.prototype.mouseMoveWallDrawingMode = function(event) {
 
-    let self = this;
+    // let self = this;
 
     let eventPointsWalls;
 
