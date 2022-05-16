@@ -68,6 +68,11 @@ FloorPlanner = function (options) {
             snapGridSize: 5,
 
             /**
+             * Snap segédvonalakhoz hány pixel
+             */
+            snapGuideRange: 15,
+
+            /**
              * Képek elérési útja
              */
             imagesPath: 'images',
@@ -151,6 +156,19 @@ FloorPlanner = function (options) {
                 pendingColor: "#666666",
 
                 /**
+                 * Folyamatban lévő rajzoláskor a fal méretének színe
+                 */
+                pendingTextColor: "#D35630",
+
+                /**
+                 * Folyamatban lévő rajzoláskor a fal méretének távolsága az ideiglenes fal végétől
+                 */
+                pendingTextOffset: {
+                    x: 20,
+                    y: 30,
+                },
+
+                /**
                  * Folyamatban lévő rajzoláskor a még nem lerakott fal áttetszősége
                  */
                 pendingOpacity: 0.6,
@@ -210,6 +228,16 @@ FloorPlanner = function (options) {
                  */
                 wallContainerElementId: 'wall-container',
 
+                /**
+                 * Segédvonal konténer HTML element ID (nem! selector)
+                 */
+                guideContainerElementId: 'guide-container-wall',
+
+                /**
+                 * Segédvonal színe
+                 */
+                guideColor: "#D35630",
+
             },
 
             /**
@@ -257,6 +285,16 @@ FloorPlanner = function (options) {
                  * Szöveg színe
                  */
                 textColor: '#333333',
+
+                /**
+                 * Betűtípus
+                 */
+                fontFamily: 'Red Hat Display',
+
+                /**
+                 * Betűméret
+                 */
+                fontSize: '24px',
 
             },
 
@@ -696,6 +734,12 @@ FloorPlanner.prototype.initVariables = function() {
     this.options.config.wall.wallContainerElement = '#' + this.options.config.wall.wallContainerElementId;
 
     /**
+     * Fal konténer HTML element selector
+     * @type {string}
+     */
+    this.options.config.wall.guideContainerElement = '#' + this.options.config.wall.guideContainerElementId;
+
+    /**
      * Szoba konténer HTML element selector
      * @type {string}
      */
@@ -813,11 +857,13 @@ FloorPlanner.prototype.reset = function (withHistory = false) {
     help(this.options.config.room.roomContainerElement).empty();
     help(this.options.config.entity.tmpEntityContainerElement).empty();
     help(this.options.config.entity.entityContainerElement).empty();
+    help(this.options.config.wall.guideContainerElement).empty();
 
     help(this.options.config.wallDrawingContainerElement)[0].classList.add('d-none');
 
     if (withHistory) {
         this.history = [];
+        this.save(1);
     }
 
 };
@@ -921,8 +967,7 @@ FloorPlanner.prototype.setMode = function(mode, modeOptions) {
  * @param modeOptions
  * @param extend
  */
-FloorPlanner.prototype.setModeOptions = function(modeOptions, extend = true)
-{
+FloorPlanner.prototype.setModeOptions = function(modeOptions, extend = true) {
 
     let self = this;
 
@@ -1074,9 +1119,24 @@ FloorPlanner.prototype.setModeOptions = function(modeOptions, extend = true)
             dataAttrCheck = 'thickness';
             dataAttrCheckValue = this.modeOptions.wall.thickness;
             break;
+        default:
+            // Segédvonalak elrejtése
+            help(this.options.config.wall.guideContainerElement).empty();
+            break;
     }
 
     help(this.options.config.dataModeElementsSelector).forEach(function (item, index, arr) {
+        if (dataAttrCheck === 'thickness') {
+            switch (dataAttrCheckValue) {
+                case self.options.config.wall.defaultThickness:
+                    dataAttrCheckValue = 'normal';
+                    break;
+                case self.options.config.wall.defaultSlimThickness:
+                    dataAttrCheckValue = 'slim';
+                    break;
+            }
+        }
+
         item.classList.remove('active');
         if (help(item).data('mode') === self.mode && (dataAttrCheck === '' || (dataAttrCheck !== '' && help(item).data(dataAttrCheck) === dataAttrCheckValue))) {
             item.classList.add('active');
@@ -1180,7 +1240,7 @@ FloorPlanner.prototype.placeTextEntity = function(entityOptions) {
         entityHeight: 0,
 
         entityParameters: {
-            textContent: '[................]'
+            textContent: 'Válassz helyiséget!'
         },
     };
 
@@ -1419,11 +1479,11 @@ FloorPlanner.prototype.setZoom = function(zoom, event) {
 
         if (event) {
 
-            let mousePosition = this.getEventCoordinates(event);
+            let eventPointsWalls = this.getEventPointsWalls(event);
 
             this.viewportOrigin = {
-                x: mousePosition.x - newViewportWidth * (mousePosition.x - this.viewportOrigin.x)  / oldViewportWidth,
-                y: mousePosition.y - newViewportHeight * (mousePosition.y - this.viewportOrigin.y)  / oldViewportHeight,
+                x: eventPointsWalls.mouseCoordinates.x - newViewportWidth * (eventPointsWalls.mouseCoordinates.x - this.viewportOrigin.x)  / oldViewportWidth,
+                y: eventPointsWalls.mouseCoordinates.y - newViewportHeight * (eventPointsWalls.mouseCoordinates.y - this.viewportOrigin.y)  / oldViewportHeight,
             };
 
         }
@@ -1462,20 +1522,20 @@ FloorPlanner.prototype.setZoom = function(zoom, event) {
     if (this.options.callbacks.zoom && this.options.callbacks.zoom instanceof Function) {
         this.options.callbacks.zoom.call(this);
     }
-}
+};
 
 /**
  * Egérkurzor csere rajzvásznon
  * @param tool
  */
 FloorPlanner.prototype.cursor = function(tool) {
-    // console.log('Change cursor: ' + tool);
+
     switch (tool) {
         case 'drawing':
-            tool = "url('" + this.options.config.imagesPath + "/cursors/pencil.svg') 0 24, auto";
+            tool = "url('" + this.options.config.imagesPath + "/cursors/pencil.svg') 0 23, auto";
             break;
         case 'drawingClose':
-            tool = "url('" + this.options.config.imagesPath + "/cursors/pencil-room.svg') 0 24, auto";
+            tool = "url('" + this.options.config.imagesPath + "/cursors/pencil-room.svg') 0 23, auto";
             break;
     }
     help(this.options.config.floorplanElementSelector)[0].style.cursor = tool;
@@ -1508,7 +1568,7 @@ FloorPlanner.prototype.dragCanvas = function(moveStepX, moveStepY) {
     this.viewportOrigin.x -= moveStepX;
     this.viewportOrigin.y -= moveStepY;
     this.initDimensions();
-}
+};
 
 /**
  * Rajzvászon mozgatása egyszerre egy irányba gombokkal
@@ -1535,9 +1595,13 @@ FloorPlanner.prototype.moveCanvas = function(moveDirection, moveStep) {
 /**
  * Event koordinátái
  * @param event
- * @returns {{mouseX: number, mouseY: number, x: (number|number), y: (number|number)}}
+ * @param snapToWalls
+ * @param snapWithPinnedPosition
+ * @param showGuideLines
+ * @param excludeWallIndices
+ * @returns {{coordinates: {x: number, y: number}, nearWallEndData: null, mouseCoordinates: {x: number, y: number}, nearWallLineData: null}}
  */
-FloorPlanner.prototype.getEventCoordinates = function(event) {
+FloorPlanner.prototype.getEventPointsWalls = function(event, snapToWalls = false, snapWithPinnedPosition = false, showGuideLines = false, excludeWallIndices = []) {
 
     let eventX, eventY;
 
@@ -1550,16 +1614,95 @@ FloorPlanner.prototype.getEventCoordinates = function(event) {
         eventY = event.pageY;
     }
 
-    let mouseCoordinates = this.offsetCoordinates({
+    let eventCoordinates = this.offsetCoordinates({
         x: eventX,
         y: eventY,
     });
 
+    let mouseCoordinates = {
+        x: Math.round(eventCoordinates.x),
+        y: Math.round(eventCoordinates.y),
+    };
+
+    let coordinates = {
+        x: mouseCoordinates.x,
+        y: mouseCoordinates.y,
+    };
+
+    let snapResult;
+    let nearWallEndData;
+    let nearWallLineData;
+
+    if (snapToWalls) {
+
+        nearWallLineData = this.nearWallLineData(coordinates, showGuideLines, this.options.config.snapGuideRange, excludeWallIndices);
+
+        if (nearWallLineData) {
+
+            // Fal vonala van közel
+
+            coordinates.x = nearWallLineData.coordinates.x;
+            coordinates.y = nearWallLineData.coordinates.y;
+
+        } else {
+
+            // Nincs közel fal vonala, nézzük, valamilyen snapping működik-e
+
+            snapResult = this.snapToWalls(
+                {
+                    x: mouseCoordinates.x,
+                    y: mouseCoordinates.y,
+                },
+                showGuideLines,
+                this.options.config.snapGuideRange,
+                snapWithPinnedPosition,
+                true,
+                excludeWallIndices
+            );
+
+            if (snapResult) {
+
+                // Sikerült a merőleges illesztés
+
+                coordinates.x = snapResult.coordinates.x;
+                coordinates.y = snapResult.coordinates.y;
+
+            }
+        }
+
+        // Megnézzük, ezen a pozíción van-e már létező fal végpontja
+
+        nearWallEndData = this.getNearWallEndData(coordinates, this.options.config.snapGuideRange, excludeWallIndices);
+
+        if (nearWallEndData) {
+
+            // Van létező fal, annak a koordinátáit használjuk fel
+            coordinates = nearWallEndData.coordinates;
+
+            // Ha végpont közelebb van, nem érdekel, fal vonala közel volt-e
+            nearWallLineData = null;
+        }
+
+    }
+
+    if (!nearWallLineData && !snapResult && !nearWallEndData) {
+
+        // Semmi snapping nem talált használható koordinátát, marad a kerekítés
+
+        coordinates = {
+            x: this.snapToGrid ? coordinates.x / this.options.config.snapGridSize * this.options.config.snapGridSize : coordinates.x,
+            y: this.snapToGrid ? coordinates.y / this.options.config.snapGridSize * this.options.config.snapGridSize : coordinates.y,
+        };
+    }
+
     return {
-        x: this.snapToGrid ? Math.round(mouseCoordinates.x / this.options.config.snapGridSize) * this.options.config.snapGridSize : mouseCoordinates.x,
-        y: this.snapToGrid ? Math.round(mouseCoordinates.y / this.options.config.snapGridSize) * this.options.config.snapGridSize : mouseCoordinates.y,
-        mouseX: mouseCoordinates.x,
-        mouseY: mouseCoordinates.y
+        coordinates: {
+            x: Math.round(coordinates.x),
+            y: Math.round(coordinates.y),
+        },
+        mouseCoordinates: mouseCoordinates,
+        nearWallEndData: nearWallEndData ?? null,
+        nearWallLineData: nearWallLineData ?? null,
     };
 };
 
@@ -1571,12 +1714,9 @@ FloorPlanner.prototype.moveCanvasTo = function(event) {
     this.setModeOptions({
         dragActionInProgress: true
     });
-    let coordinates = this.getEventCoordinates(event);
-    this.pinnedPosition = {
-        x: coordinates.mouseX,
-        y: coordinates.mouseY,
-    }
-}
+    let eventPointsWalls = this.getEventPointsWalls(event);
+    this.pinnedPosition = eventPointsWalls.mouseCoordinates;
+};
 
 /**
  * Kapott koordináták euklideszi távolsága a pinnedPosition-tól
@@ -1584,7 +1724,7 @@ FloorPlanner.prototype.moveCanvasTo = function(event) {
  * @returns {number}
  */
 FloorPlanner.prototype.distanceFromPinnedPosition = function(coordinates) {
-    return Math.round(svgDraw.distance(this.pinnedPosition, coordinates));
+    return svgDraw.distance(this.pinnedPosition, coordinates);
 };
 
 /**
@@ -1687,6 +1827,11 @@ FloorPlanner.prototype.newWall = function(start, end, thickness) {
 
             let intersectionOnWall1 = svgDraw.calculateIntersection(perpendicularEquationOnWall, wall.equations.base);
             let intersectionOnWall2 = svgDraw.calculateIntersection(perpendicularEquationOnEntity, wall.equations.base);
+
+            if (!intersectionOnWall1 || !intersectionOnWall2) {
+                entitiesToUpdate = null;
+                break;
+            }
 
             let newCoordinates = svgDraw.middle(intersectionOnWall1, intersectionOnWall2);
 
@@ -1801,7 +1946,7 @@ FloorPlanner.prototype.housekeepWalls = function() {
         }
 
     }
-}
+};
 
 /**
  * Entitások átindexelése
@@ -1870,10 +2015,13 @@ FloorPlanner.prototype.renderWalls = function() {
             upperCorner = svgDraw.calculateIntersection(wall.equations.up, wall.former.equations.up);
             lowerCorner = svgDraw.calculateIntersection(wall.equations.down, wall.former.equations.down);
 
-            formerCornerSize = svgDraw.distancePow(upperCorner, {
-                x: wall.former.end.x,
-                y: wall.former.end.y
-            });
+            if (upperCorner) {
+                formerCornerSize = svgDraw.distancePow(upperCorner, {
+                    x: wall.former.end.x,
+                    y: wall.former.end.y
+                });
+            }
+
         }
 
         if (!upperCorner || !lowerCorner || formerCornerSize >= cornerSizeLimit) {
@@ -1882,9 +2030,10 @@ FloorPlanner.prototype.renderWalls = function() {
             lowerCorner = svgDraw.calculateIntersection(wall.equations.down, wallStartCapEquation);
         }
 
-        wall.coordinates.push(upperCorner, lowerCorner);
-
-        pathDefinition = 'M' + upperCorner.x + ',' + upperCorner.y + ' L' + lowerCorner.x + ',' + lowerCorner.y + ' ';
+        if (upperCorner && lowerCorner) {
+            wall.coordinates.push(upperCorner, lowerCorner);
+            pathDefinition = 'M' + upperCorner.x + ',' + upperCorner.y + ' L' + lowerCorner.x + ',' + lowerCorner.y + ' ';
+        }
 
         /**
          * Fal végére képzelt merőleges záróegyenes egyenlete
@@ -1901,10 +2050,13 @@ FloorPlanner.prototype.renderWalls = function() {
             upperCorner = svgDraw.calculateIntersection(wall.equations.up, wall.latter.equations.up);
             lowerCorner = svgDraw.calculateIntersection(wall.equations.down, wall.latter.equations.down);
 
-            latterCornerSize = svgDraw.distancePow(upperCorner, {
-                x: wall.latter.start.x,
-                y: wall.latter.start.y
-            });
+            if (upperCorner) {
+                latterCornerSize = svgDraw.distancePow(upperCorner, {
+                    x: wall.latter.start.x,
+                    y: wall.latter.start.y
+                });
+            }
+
         }
 
         if (!upperCorner  || !lowerCorner || latterCornerSize >= cornerSizeLimit) {
@@ -1913,9 +2065,10 @@ FloorPlanner.prototype.renderWalls = function() {
             lowerCorner = svgDraw.calculateIntersection(wall.equations.down, wallEndCapEquation);
         }
 
-        wall.coordinates.push(upperCorner, lowerCorner);
-
-        pathDefinition += 'L' + lowerCorner.x + ',' + lowerCorner.y + ' L' + upperCorner.x + ',' + upperCorner.y + ' Z';
+        if (upperCorner && lowerCorner) {
+            wall.coordinates.push(upperCorner, lowerCorner);
+            pathDefinition += 'L' + lowerCorner.x + ',' + lowerCorner.y + ' L' + upperCorner.x + ',' + upperCorner.y + ' Z';
+        }
 
         // SVG element létrehozása vagy frissítése
         this.makeOrUpdateWallElement(wall, pathDefinition);
@@ -2113,6 +2266,405 @@ FloorPlanner.prototype.drawEntities = function() {
 };
 
 /**
+ * Snapping-hez egyenletek és pontok számítása
+ * @param snapWithPinnedPosition
+ * @param snapWithWalls
+ * @param excludeWallIndices
+ * @returns {*[]}
+ */
+FloorPlanner.prototype.snapEquationsAndPoints = function(snapWithPinnedPosition = false, snapWithWalls = true, excludeWallIndices = []) {
+
+    let equations = [];
+
+    if (snapWithPinnedPosition) {
+
+        // A tárolt pinned position-hoz snappelés (elkezdett fal kezdőpontja általános pozíción)
+
+        equations.push({
+            A: 'h',
+            B: this.pinnedPosition.y,
+            point: this.pinnedPosition,
+            x: null,
+            y: this.pinnedPosition.y,
+            show: false,
+        });
+
+        equations.push({
+            A: 'v',
+            B: this.pinnedPosition.x,
+            point: this.pinnedPosition,
+            x: this.pinnedPosition.x,
+            y: null,
+            show: false,
+        });
+
+    }
+
+    if (snapWithWalls) {
+
+        // Falakhoz snappelés
+
+        for (let index in this.walls) {
+
+            if (!excludeWallIndices.includes(this.walls[index].index)) {
+
+                // Bizonyos üzemmódokban érdemes kihagyni bizonyos falakat, pl. az éppen mozgatással érintetteket
+
+                if (Math.abs(this.walls[index].end.y - this.walls[index].start.y) !== 0 && Math.abs(this.walls[index].end.x - this.walls[index].start.x) !== 0) {
+
+                    // Általános fal, nem vízszintes és nem is függőleges
+
+                    // Fal középvonalának egyenlete
+                    equations.push({
+                        A: this.walls[index].equations.base.A,
+                        B: this.walls[index].equations.base.B,
+                        point: this.walls[index].start,
+                        x: this.walls[index].start.x,
+                        y: this.walls[index].start.y,
+                        secondPoint: this.walls[index].end,
+                        show: true
+                    });
+
+                    // Kezdőpontra állított merőleges
+                    let perpendicuarEquationStart = svgDraw.calculatePerpendicularEquation(this.walls[index].equations.base, this.walls[index].start.x, this.walls[index].start.y);
+                    equations.push({
+                        A: perpendicuarEquationStart.A,
+                        B: perpendicuarEquationStart.B,
+                        point: this.walls[index].start,
+                        x: this.walls[index].start.x,
+                        y: this.walls[index].start.y,
+                        secondPoint: this.walls[index].end,
+                        show: true,
+                    });
+
+                    // Végpontra állított merőleges
+                    let perpendicuarEquationEnd = svgDraw.calculatePerpendicularEquation(this.walls[index].equations.base, this.walls[index].end.x, this.walls[index].end.y);
+                    equations.push({
+                        A: perpendicuarEquationEnd.A,
+                        B: perpendicuarEquationEnd.B,
+                        point: this.walls[index].end,
+                        x: this.walls[index].end.x,
+                        y: this.walls[index].end.y,
+                        secondPoint: this.walls[index].start,
+                        show: true,
+                    });
+
+                }
+
+                // Kezőpontot metsző függőleges egyenes
+                equations.push({
+                    A: 'v',
+                    B: this.walls[index].start.x,
+                    point: this.walls[index].start,
+                    x: this.walls[index].start.x,
+                    y: null,
+                    show: true,
+                });
+
+                // Kezőpontot metsző vízszintes egyenes
+                equations.push({
+                    A: 'h',
+                    B: this.walls[index].start.y,
+                    point: this.walls[index].start,
+                    x: null,
+                    y: this.walls[index].start.y,
+                    show: true,
+                });
+
+                // Végpontot metsző függőleges egyenes
+                equations.push({
+                    A: 'v',
+                    B: this.walls[index].end.x,
+                    point: this.walls[index].end,
+                    x: this.walls[index].end.x,
+                    y: null,
+                    show: true,
+                });
+
+                // Végpontot metsző vízszintes egyenes
+                equations.push({
+                    A: 'h',
+                    B: this.walls[index].end.y,
+                    point: this.walls[index].end,
+                    x: null,
+                    y: this.walls[index].end.y,
+                    show: true,
+                });
+
+            }
+        }
+    }
+
+    return equations;
+};
+
+/**
+ * Segédvonalak (látható vagy virtuális, snapping)
+ * @param coordinates
+ * @param showGuideLines
+ * @param range
+ * @param snapWithPinnedPosition
+ * @param snapWithWalls
+ * @param excludeWallIndices
+ * @returns {{distance: number, coordinates: {}}|boolean}
+ */
+FloorPlanner.prototype.snapToWalls = function(coordinates, showGuideLines = false, range = Infinity, snapWithPinnedPosition = false, snapWithWalls = true, excludeWallIndices = []) {
+
+    let bestDistancePow = range * range;
+
+    let bestCoordinates = {
+        x: null,
+        y: null
+    };
+
+    let possibleFound = [];
+
+    if (showGuideLines) {
+        help(this.options.config.wall.guideContainerElement).empty();
+    }
+
+    let equations = this.snapEquationsAndPoints(snapWithPinnedPosition, snapWithWalls, excludeWallIndices);
+
+    for (let eqIndex in equations) {
+
+        let projectToEquation = svgDraw.projectToEquation(equations[eqIndex], coordinates);
+
+        if (projectToEquation && projectToEquation.distancePow <= bestDistancePow) {
+
+            projectToEquation.point = equations[eqIndex].point;
+            projectToEquation.secondPoint = equations[eqIndex].secondPoint;
+            projectToEquation.show = equations[eqIndex].show;
+
+            projectToEquation.x = equations[eqIndex].x !== null ? projectToEquation.coordinates.x : null;
+            projectToEquation.y = equations[eqIndex].y !== null ? projectToEquation.coordinates.y : null;
+
+            bestDistancePow = projectToEquation.distancePow;
+
+            possibleFound.push(projectToEquation);
+        }
+    }
+
+    if (bestDistancePow < range * range) {
+
+        possibleFound.sort(function(a, b) {
+            return a.distancePow - b.distancePow;
+        });
+
+        let draw = [];
+
+        for (let i in possibleFound) {
+
+            let keepDraw = false;
+
+            if (bestCoordinates.x === null && bestCoordinates.y === null) {
+
+                // Két üres hely: x és y
+                bestCoordinates.x = possibleFound[i].x;
+                bestCoordinates.y = possibleFound[i].y;
+                keepDraw = true;
+
+            } else {
+
+                // Csak 1 üres hely: x vagy x
+
+                if (bestCoordinates.x === null && possibleFound[i].x !== null && possibleFound[i].y === null) {
+
+                    // x hely üres, és possibleFound is csak x-et töltene
+
+                    bestCoordinates.x = possibleFound[i].x;
+                    keepDraw = true;
+                }
+
+                if (bestCoordinates.y === null && possibleFound[i].y !== null && possibleFound[i].x === null) {
+
+                    // y hely üres, és possibleFound is csak y-t töltene
+
+                    bestCoordinates.y = possibleFound[i].y;
+                    keepDraw = true;
+                }
+            }
+
+            if (keepDraw) {
+                draw.push(possibleFound[i]);
+            }
+
+            if (bestCoordinates.x !== null && bestCoordinates.y !== null) {
+                break;
+            }
+        }
+
+        bestCoordinates = {
+            x: bestCoordinates.x ?? coordinates.x,
+            y: bestCoordinates.y ?? coordinates.y,
+        };
+
+        if (showGuideLines) {
+
+            for (let i in draw) {
+
+                if (draw[i].show) {
+
+                    let point = draw[i].point;
+
+                    if (draw[i].secondPoint) {
+                        if (draw[i].secondPoint) {
+                            svgDraw.createElement("path", {
+                                d: 'M' + draw[i].secondPoint.x + ',' + draw[i].secondPoint.y + ' L' + point.x + ',' + point.y + ' L' + bestCoordinates.x + ',' + bestCoordinates.y,
+                                stroke: this.options.config.wall.guideColor,
+                                "stroke-width": 2,
+                                "stroke-opacity": 1,
+                                "stroke-dasharray": 0,
+                                fill: 'none'
+                            }, this.options.config.wall.guideContainerElementId);
+                        }
+                    } else {
+                        svgDraw.createElement("path", {
+                            d: 'M' + point.x + ',' + point.y + ' L' + bestCoordinates.x + ',' + bestCoordinates.y,
+                            stroke: this.options.config.wall.guideColor,
+                            "stroke-width": 2,
+                            "stroke-opacity": 1,
+                            "stroke-dasharray": 4,
+                            fill: 'none'
+                        }, this.options.config.wall.guideContainerElementId);
+                    }
+
+                }
+            }
+        }
+
+        return {
+            coordinates: bestCoordinates,
+            distancePow: bestDistancePow,
+        };
+
+    } else {
+        return false;
+    }
+};
+
+/**
+ * Megadott koordinátához közeli falvonalak keresése
+ * @param coordinates
+ * @param range
+ * @param excludeWallIndices
+ * @returns {null|*}
+ */
+FloorPlanner.prototype.nearWallLineData = function(coordinates, showGuideLines, range = Infinity, excludeWallIndices = []) {
+
+    let bestDistancePow = Infinity;
+    let possibleFound = [];
+
+    if (showGuideLines) {
+        help(this.options.config.wall.guideContainerElement).empty();
+    }
+
+    for (let i in this.walls) {
+        if (!excludeWallIndices.includes(this.walls[i].index)) {
+            let projectToEquation = svgDraw.projectToEquation(this.walls[i].equations.base, coordinates);
+
+            if (projectToEquation && (projectToEquation.distancePow <= bestDistancePow)) {
+
+                if (
+                    svgDraw.between(Math.round(projectToEquation.coordinates.x), Math.round(this.walls[i].start.x), Math.round(this.walls[i].end.x)) &&
+                    svgDraw.between(Math.round(projectToEquation.coordinates.y), Math.round(this.walls[i].start.y), Math.round(this.walls[i].end.y))
+                ) {
+
+                    bestDistancePow = projectToEquation.distancePow;
+
+                    projectToEquation.wallIndex = this.walls[i].index;
+                    possibleFound.push(projectToEquation);
+
+                }
+            }
+        }
+    }
+
+    possibleFound.sort(function (a, b) {
+        return a.distancePow - b.distancePow;
+    });
+
+    let bestFound = possibleFound.shift();
+
+    if (bestFound && bestFound.distancePow < range * range) {
+
+        if (showGuideLines) {
+
+            let bestWall = this.walls[bestFound.wallIndex];
+
+            svgDraw.createElement("path", {
+                d: 'M' + bestWall.start.x + ',' + bestWall.start.y + ' L' + bestWall.end.x + ',' + bestWall.end.y,
+                stroke: this.options.config.wall.guideColor,
+                "stroke-width": 2,
+                "stroke-opacity": 1,
+                "stroke-dasharray": 0,
+                fill: 'none'
+            }, this.options.config.wall.guideContainerElementId);
+
+            svgDraw.createElement('circle', {
+                cx: bestFound.coordinates.x,
+                cy: bestFound.coordinates.y,
+                r: 3,
+                fill: this.options.config.wall.guideColor,
+            }, this.options.config.wall.guideContainerElementId);
+
+        }
+
+        return bestFound;
+    }
+
+    return null;
+};
+
+/**
+ * Megadott koordinátához közeli falvégek keresése
+ * @param coordinates
+ * @param range
+ * @param excludeWallIndices
+ * @returns {{endpoint, coordinates, endpointName: string, bestWall: string}|boolean}
+ */
+FloorPlanner.prototype.getNearWallEndData = function(coordinates, range = Infinity, excludeWallIndices = []) {
+
+    let bestDistance = Infinity;
+    let bestWallIndex;
+    let endpoint;
+    let endpointName;
+
+    for (let i in this.walls) {
+        if (!excludeWallIndices.includes(this.walls[i].index)) {
+
+            let currentDistance;
+
+            currentDistance = svgDraw.distance(this.walls[i].start, coordinates);
+            if (currentDistance < bestDistance) {
+                bestDistance = currentDistance;
+                bestWallIndex = i;
+                endpoint = this.walls[i].start;
+                endpointName = 'start';
+            }
+
+            currentDistance = svgDraw.distance(this.walls[i].end, coordinates);
+            if (currentDistance < bestDistance) {
+                bestDistance = currentDistance;
+                bestWallIndex = i;
+                endpoint = this.walls[i].end;
+                endpointName = 'end';
+            }
+        }
+    }
+
+    if (bestDistance <= range) {
+        return {
+            coordinates: endpoint,
+            bestWallIndex: bestWallIndex,
+            endpointName: endpointName,
+        };
+    } else {
+        return false;
+    }
+
+};
+
+/**
  * Megadott koordinátájú pontból kiinduló vagy oda érkező falak tömbjét adja vissza
  * @param point Adott pont koordinátái {x,y}
  * @param wallToExclude Az a fal, ami nem érdekel
@@ -2153,7 +2705,7 @@ FloorPlanner.prototype.getWallNode = function(point, wallToExclude = null) {
         return wallsFromSamePoint[i].wall;
     }
     return false;
-}
+};
 
 /**
  * Fal-adatok előfeldolgozása
@@ -2322,7 +2874,7 @@ FloorPlanner.prototype.addEntity = function(entity) {
     let lastIndex = this.entities.length - 1;
     this.entities[lastIndex].index = lastIndex;
     return lastIndex;
-}
+};
 
 /**
  * Fal középvonal-szakasza alapján egyenes egyenlete
@@ -2497,7 +3049,7 @@ FloorPlanner.prototype.getWallsByEndpoints = function(coordinates, range = 30, e
 
     if (found.length) {
         found.sort(function(a, b) {
-            return a.distance > b.distance;
+            return a.distance - b.distance;
         });
         return found;
     }
@@ -2542,10 +3094,7 @@ FloorPlanner.prototype.setHandleOnHover = function(event) {
     }
 
     // Koordináta számítása
-    let coordinates = this.getEventCoordinates(event);
-
-    // Koordinátához közeli kezdő- vagy végponttal rendelkező falak
-    let nearWalls = this.getWallsByEndpoints(coordinates);
+    let eventPointsWalls = this.getEventPointsWalls(event, true);
 
     if (entity) {
 
@@ -2559,18 +3108,17 @@ FloorPlanner.prototype.setHandleOnHover = function(event) {
         return;
     }
 
-    if (nearWalls) {
+    // Koordinátához közeli kezdő- vagy végponttal rendelkező falak
+    if (eventPointsWalls.nearWallEndData) {
         // Vannak olyan sarokpontok, amelyek a koordinátához közeliek
 
-        let nearestWallArray = nearWalls[0];
-
-        if (this.handle && this.handle.type === 'node' && this.handle.coordinates === nearestWallArray.endpoint) {
+        if (this.handle && this.handle.type === 'node' && this.handle.coordinates === eventPointsWalls.nearWallEndData.coordinates) {
             // Tökéletes a meglévő handle, nem vizsgálódunk tovább
             return;
         }
 
         // Valami máson állt a handle, átállítjuk
-        this.setWallNodeHandle(nearestWallArray.endpoint);
+        this.setWallNodeHandle(eventPointsWalls.nearWallEndData.coordinates);
         return;
     }
 
@@ -2672,13 +3220,9 @@ FloorPlanner.prototype.mouseDownSelectMode = function(event) {
  * @param event
  */
 FloorPlanner.prototype.mouseDownWallDrawingMode = function(event) {
-    let coordinates = this.getEventCoordinates(event);
+    let eventPointsWalls = this.getEventPointsWalls(event, true);
     if (!this.modeOptions.drawingActionInProgress) {
-        this.pinnedPosition = {
-            x: coordinates.x,
-            y: coordinates.y
-        };
-        //console.log(this.pinnedPosition);
+        this.pinnedPosition = eventPointsWalls.coordinates;
         this.setModeOptions({
             drawingActionInProgress: true
         });
@@ -2689,35 +3233,56 @@ FloorPlanner.prototype.mouseDownWallDrawingMode = function(event) {
 };
 
 /**
+ * Falak egy egyenesbe esnek-e
+ * @param wall1
+ * @param wall2
+ * @returns {boolean}
+ */
+FloorPlanner.prototype.wallsInSameLine = function(wall1, wall2) {
+    if (svgDraw.isSame(wall1.equations.base, wall2.equations.base)) {
+        return true;
+    }
+    if (!svgDraw.calculateIntersection(wall1.equations.base, wall2.equations.base, 5)) {
+        return true;
+    }
+    return false;
+};
+
+/**
  * MouseMove event handler: selectMode
  * @param event
  */
 FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
-    let coordinates = this.getEventCoordinates(event);
+
+    let eventPointsWalls;
 
     if (this.modeOptions.dragActionInProgress) {
-        let distX = (coordinates.mouseX - this.pinnedPosition.x) * this.factor;
-        let distY = (coordinates.mouseY - this.pinnedPosition.y) * this.factor;
+        eventPointsWalls = this.getEventPointsWalls(event);
+        let distX = (eventPointsWalls.mouseCoordinates.x - this.pinnedPosition.x) * this.factor;
+        let distY = (eventPointsWalls.mouseCoordinates.y - this.pinnedPosition.y) * this.factor;
         this.dragCanvas(distX, distY);
     } else if (this.modeOptions.elementSelected) {
 
         if (this.handle.type === 'node' && this.modeOptions.drawingActionInProgress) {
 
-            // Fal végén lévő fogantyú mozgatása
-
             // Fogantyú régi koordinátái eltesszük arra az esetre, ha vissza kell csinálni a műveletet
             let oldCoordinates = this.handle.coordinates;
 
-            // csak az x és y menjen bele, más elemei nem
-            let rawCoordinates = {
-                x: coordinates.x,
-                y: coordinates.y
-            };
-
-            let entitiesToUpdate = [];
-
             // Sarokpontok mozgatása
             let toDragArray = this.getWallsByEndpoints(oldCoordinates, 0);
+
+            let wallsToExcludeIndices = [];
+            for (let i in toDragArray) {
+                wallsToExcludeIndices.push(toDragArray[i].wall.index);
+            }
+
+            eventPointsWalls = this.getEventPointsWalls(event, true, false, true, wallsToExcludeIndices);
+
+            // csak az x és y menjen bele, más elemei nem
+            let rawCoordinates = eventPointsWalls.coordinates;
+
+            // Fal végén lévő fogantyú mozgatása
+            let entitiesToUpdate = [];
 
             for (let i in toDragArray) {
 
@@ -2758,14 +3323,17 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
                 this.handle.coordinates = rawCoordinates;
 
                 // Fogantyú mozgatása
-                help(this.handle.graph.children[0]).attr('x', coordinates.x - this.options.config.wall.nodeHandleWidth / 2);
-                help(this.handle.graph.children[0]).attr('y', coordinates.y - this.options.config.wall.nodeHandleHeight / 2);
+                help(this.handle.graph.children[0]).attr('x', rawCoordinates.x - this.options.config.wall.nodeHandleWidth / 2);
+                help(this.handle.graph.children[0]).attr('y', rawCoordinates.y - this.options.config.wall.nodeHandleHeight / 2);
 
                 this.renderFloorplan();
 
             }
 
         } else if (this.handle.type === 'wall' && this.modeOptions.drawingActionInProgress) {
+
+            eventPointsWalls = this.getEventPointsWalls(event);
+            let coordinates = eventPointsWalls.coordinates;
 
             // Fal párhuzamos mozgatása
 
@@ -2794,6 +3362,11 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
             let newStart = svgDraw.calculateIntersection(startBoundaryEquation, movedWallBaseEquation);
             let newEnd = svgDraw.calculateIntersection(movedWallBaseEquation, endBoundaryEquation);
 
+            if (!newStart || !newEnd) {
+                // Párhuzamos egyenesek egyvonalban
+                return;
+            }
+
             // Kerekítés
             newStart = {
                 x: Math.round(newStart.x),
@@ -2807,6 +3380,14 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
 
             let allEntitiesOk = true;
             let entitiesToUpdate = [];
+
+            if (this.handle.wall.former !== null && this.wallsInSameLine(this.handle.wall, this.handle.wall.former)) {
+                return;
+            }
+
+            if (this.handle.wall.latter !== null && this.wallsInSameLine(this.handle.wall, this.handle.wall.latter)) {
+                return;
+            }
 
             // Fogantyú falának mozgatása
             this.handle.wall.start = newStart;
@@ -2907,6 +3488,10 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
 
         } else if (this.handle.type === 'entity' && this.modeOptions.drawingActionInProgress) {
 
+            eventPointsWalls = this.getEventPointsWalls(event);
+
+            let coordinates = eventPointsWalls.coordinates;
+
             // Entitás mozgatása
 
             if (this.handle.entity.group === 'entityOnWall') {
@@ -2955,22 +3540,35 @@ FloorPlanner.prototype.mouseMoveSelectMode = function(event) {
  */
 FloorPlanner.prototype.mouseMoveWallDrawingMode = function(event) {
 
-    let coordinates = this.getEventCoordinates(event);
+    let self = this;
+
+    let eventPointsWalls;
 
     if (this.modeOptions.drawingActionInProgress) {
 
-        this.currentPosition = {
-            x: coordinates.x,
-            y: coordinates.y
-        };
+        eventPointsWalls = this.getEventPointsWalls(event, true, true, true);
+
+        let coordinates = eventPointsWalls.coordinates;
+
+        this.currentPosition = coordinates;
 
         let distanceFromPinnedPosition = this.distanceFromPinnedPosition(coordinates);
+
+        /*
+        let calculateDistanceText = function(distance) {
+            return Math.round(distance / self.options.config.meter * 100) + ' cm';
+        };
+        */
 
         // Csak akkor kezdjük mutatni a falat, ha eléggé eltávolodott a kezdőponttól (30cm)
         if (distanceFromPinnedPosition > this.options.config.wall.minimumWallLength) {
             if (!help(this.options.config.wall.tmpWallElement).length) {
-                svgDraw.createElement('line', {
+
+                let tmpWallElement = svgDraw.createElement('g', {
                     id: this.options.config.wall.tmpWallElementId,
+                }, this.options.config.wall.tmpWallContainerElementId)
+
+                let tmpWallLineElement = svgDraw.createElement('line', {
                     x1: this.pinnedPosition.x,
                     y1: this.pinnedPosition.y,
                     x2: this.currentPosition.x,
@@ -2979,27 +3577,64 @@ FloorPlanner.prototype.mouseMoveWallDrawingMode = function(event) {
                     'stroke-linecap': 'butt',
                     'stroke-opacity': this.options.config.wall.pendingOpacity,
                     stroke: this.options.config.wall.pendingColor,
-                },  this.options.config.wall.tmpWallContainerElementId);
+                });
+
+                help(tmpWallElement).appendChild(tmpWallLineElement);
+
+                /*
+                // TODO ideiglenes fal felirata
+                let tmpTextElement = svgDraw.createElement('text', {
+                    id: this.options.config.wall.tmpWallElementId + 'text',
+                    x: this.currentPosition.x + this.options.config.wall.pendingTextOffset.x,
+                    y: this.currentPosition.y + this.options.config.wall.pendingTextOffset.y,
+                    'font-size': '18',
+                    'font-family': 'inherit',
+                    'font-weight': 'normal',
+                    stroke: 'none',
+                    'text-anchor': 'middle',
+                    fill: this.options.config.wall.pendingTextColor,
+                });
+
+                tmpTextElement.textContent = calculateDistanceText(distanceFromPinnedPosition);
+
+                help(tmpWallElement).appendChild(tmpTextElement);
+
+                */
+
             } else {
                 // Már csak a végpontot mozgatjuk
-                help(this.options.config.wall.tmpWallElement).attr('x2', this.currentPosition.x);
-                help(this.options.config.wall.tmpWallElement).attr('y2', this.currentPosition.y);
+
+                let tmpWallParts = help(this.options.config.wall.tmpWallElement).children();
+
+                for (let i in tmpWallParts) {
+                    let tmpWallPart = tmpWallParts[i][0];
+                    if (tmpWallPart.tagName === 'line') {
+                        help(tmpWallPart).attr('x2', this.currentPosition.x);
+                        help(tmpWallPart).attr('y2', this.currentPosition.y);
+                    } else if (tmpWallPart.tagName === 'text') {
+                        /*
+                        // TODO ideiglenes fal felirata
+                        help(tmpWallPart).attr('x', this.currentPosition.x + this.options.config.wall.pendingTextOffset.x);
+                        help(tmpWallPart).attr('y', this.currentPosition.y + this.options.config.wall.pendingTextOffset.y);
+                        help(tmpWallPart)[0].textContent = calculateDistanceText(distanceFromPinnedPosition);
+                        */
+                    }
+                }
+
             }
-
-            // Megnézzük, ezen a pozíción van-e már létező fal végpontja
-            let wallNode = this.getWallNode(this.currentPosition);
-            this.setModeOptions({
-                needToFinishDrawingModeOnClick: !!wallNode
-            });
-
         }
 
     } else {
-        this.pinnedPosition = {
-            x: coordinates.x,
-            y: coordinates.y
-        };
+
+        eventPointsWalls = this.getEventPointsWalls(event, true, false, true);
+        this.pinnedPosition = eventPointsWalls.coordinates;
     }
+
+    // Megnézzük, ezen a pozíción van-e már létező fal végpontja, és ha igen, befejező üzemmód lesz
+    this.setModeOptions({
+        needToFinishDrawingModeOnClick: !!eventPointsWalls.nearWallEndData
+    });
+
 };
 
 /**
@@ -3040,7 +3675,7 @@ FloorPlanner.prototype.removeHandle = function() {
             elementSelected: false,
         });
     }
-}
+};
 
 /**
  * MouseUp event handler: selectMode
@@ -3082,6 +3717,22 @@ FloorPlanner.prototype.endCurrentWallDrawing = function(forceDiscard = false)
 };
 
 /**
+ * Falba csatlakozás
+ * @param wallIndex
+ * @param coordinates
+ */
+FloorPlanner.prototype.splitWall = function(wallIndex, coordinates) {
+
+    // TODO fal splittelése, ha ketté is kell vágni valóban a falat
+
+    this.setModeOptions({
+        drawingActionInProgress: false,
+        needToFinishDrawingModeOnClick: false
+    });
+
+};
+
+/**
  * MouseUp event handler: wallDrawingMode
  * @param event
  */
@@ -3089,28 +3740,39 @@ FloorPlanner.prototype.mouseUpWallDrawingMode = function(event) {
 
     if (help(this.options.config.wall.tmpWallElement).length) {
 
+        let eventPointsWalls = this.getEventPointsWalls(event, true, true, true);
+
+        let coordinates = eventPointsWalls.coordinates;
+
         // Van ideiglenes fal
 
         // Megnézzük, milyen messze vagyunk az 1. kattintás óta
         // Ha bizonyos távolságon belül van, ne tegyünk le értelmezhetetlenül pici falat
-        let distanceFromPinnedPosition = this.distanceFromPinnedPosition(this.currentPosition);
+        let distanceFromPinnedPosition = this.distanceFromPinnedPosition(coordinates);
 
         // console.log(distanceFromPinnedPosition);
 
         if (distanceFromPinnedPosition > this.options.config.wall.minimumWallLength) {
 
             // Új fal létrehozása és listához adása
-            let newWall = this.newWall(this.pinnedPosition, this.currentPosition, this.modeOptions.wall.thickness);
+            let newWall = this.newWall(this.pinnedPosition, coordinates, this.modeOptions.wall.thickness);
 
             this.addWall(newWall);
+
+            if (eventPointsWalls.nearWallLineData) {
+                this.splitWall(eventPointsWalls.nearWallLineData.wallIndex, eventPointsWalls.nearWallLineData.coordinates);
+            }
 
             this.endCurrentWallDrawing();
 
             // Fal vége legyen az új rögzített pozíció, innen indul a következő fal
-            this.pinnedPosition = this.currentPosition;
+            this.pinnedPosition = coordinates;
 
             return true;
         }
+
+        help(this.options.config.wall.guideContainerElement).empty();
+
     }
 
     return false;
@@ -3215,20 +3877,18 @@ FloorPlanner.prototype.polygonRegardingLineThickness = function(vertexList, way)
         let intersectionUp = svgDraw.calculateIntersection(currentEdgeEquations.up, nextEdgeEquations.up);
         let intersectionDown = svgDraw.calculateIntersection(currentEdgeEquations.down, nextEdgeEquations.down);
 
-        if (svgDraw.pointInsidePolygon(intersectionUp, polygon)) {
-            //this.debugPoint(intersectionUp);
-            inside.push(intersectionUp);
-        } else {
-            //this.debugPoint(intersectionUp);
-            outside.push(intersectionUp);
-        }
+        if (intersectionUp && intersectionDown) {
+            if (svgDraw.pointInsidePolygon(intersectionUp, polygon)) {
+                inside.push(intersectionUp);
+            } else {
+                outside.push(intersectionUp);
+            }
 
-        if (svgDraw.pointInsidePolygon(intersectionDown, polygon)) {
-            //this.debugPoint(intersectionDown);
-            inside.push(intersectionDown);
-        } else {
-            //this.debugPoint(intersectionDown);
-            outside.push(intersectionDown);
+            if (svgDraw.pointInsidePolygon(intersectionDown, polygon)) {
+                inside.push(intersectionDown);
+            } else {
+                outside.push(intersectionDown);
+            }
         }
 
     }
@@ -3544,8 +4204,8 @@ FloorPlanner.prototype.entityGraphics = function (group, kind, look, entityWidth
                 let textAttributes = {
                     x: 0,
                     y: 0,
-                    'font-size': '24',
-                    'font-family': 'inherit',
+                    'font-size': this.options.config.entity.fontSize,
+                    'font-family': this.options.config.entity.fontFamily,
                     'font-weight': 'normal',
                     stroke: 'none',
                     'text-anchor': 'middle',
@@ -3557,13 +4217,13 @@ FloorPlanner.prototype.entityGraphics = function (group, kind, look, entityWidth
                 tmpText.textContent = entityObject.params.textContent;
 
                 help(this.options.config.wall.wallContainerElement).appendChild(tmpText);
-                let tmpTextBoundingClientRect = tmpText.getBoundingClientRect();
+                let tmpTextBBox = tmpText.getBBox();
 
                 // Ideiglenes szövegdoboz már nem kell
                 tmpText.remove();
 
-                entityWidth = tmpTextBoundingClientRect.width + 10;
-                entityHeight = tmpTextBoundingClientRect.height + 10;
+                entityWidth = tmpTextBBox.width + 10;
+                entityHeight = tmpTextBBox.height + 10;
 
                 // Eltesszük az entityObject-be is, utólag is legyen meg a számítási eredmény
                 entityObject.calculated.width = entityWidth;
@@ -3574,12 +4234,12 @@ FloorPlanner.prototype.entityGraphics = function (group, kind, look, entityWidth
                     type: 'rect',
                     attributes: {
                         x: -entityWidth / 2,
-                        y: -entityHeight / 2 - 5,
+                        y: -entityHeight / 2 - 8,
                         width: entityWidth,
                         height: entityHeight,
                         fill: 'transparent',
                         stroke: 'none',
-                        'stroke-width': 0.2
+                        'stroke-width': 0.4
                     }
                 });
 
@@ -3628,9 +4288,11 @@ FloorPlanner.prototype.entitiesOfWall = function(wall) {
  * Tényleges tartalom befoglaló méretei
  * @param marginX
  * @param marginY
+ * @param minWidth Minimális szélesség pixelben
+ * @param minHeight Minimális magasság pixelben
  * @returns {{coordinates: {x: number, y: number}, width: number, height: number}}
  */
-FloorPlanner.prototype.getRealContentDimensions = function(marginX = 0, marginY = 0) {
+FloorPlanner.prototype.getRealContentDimensions = function(marginX = 0, marginY = 0, minWidth = 800, minHeight = 600) {
 
     let xArray = [];
     let yArray = [];
@@ -3685,13 +4347,28 @@ FloorPlanner.prototype.getRealContentDimensions = function(marginX = 0, marginY 
     ]);
     */
 
+    let width = maxX - minX;
+    let height = maxY - minY;
+
+    if (minWidth && width < minWidth) {
+        maxX += (minWidth - width) / 2;
+        minX -= (minWidth - width) / 2;
+        width = maxX - minX;
+    }
+
+    if (minHeight && height < minHeight) {
+        maxY += (minHeight - height) / 2;
+        minY -= (minHeight - height) / 2;
+        height = maxY - minY;
+    }
+
     return {
         coordinates: {
             x: minX,
             y: minY
         },
-        width: maxX - minX,
-        height: maxY - minY,
+        width: width,
+        height: height,
     };
 };
 
@@ -3932,7 +4609,18 @@ FloorPlanner.prototype.makeEntity = function(entityOptions) {
                 }
             ];
 
-            let angleRad = svgDraw.degToRad(entity.angleDeg);
+            // Az entitásnak a fal szögében kell állnia, de ha a fal oldala cserélve van, 180 fokkal fordul
+            let transformAngle = entity.angleDeg;
+
+            if (entity.entityParameters.changeSide) {
+                transformAngle -= 180;
+                if (transformAngle < 0) {
+                    transformAngle += 360;
+                }
+                transformAngle = transformAngle % 360;
+            }
+
+            let angleRad = svgDraw.degToRad(transformAngle);
 
             let rotatedPolygon = [];
 
