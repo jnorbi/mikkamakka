@@ -119,66 +119,111 @@ svgDraw = {
     },
 
     /**
-     * Két egyenes metszéspontja
+     * Két megadott meredekség között bezárt szög fokban
+     * @param m1
+     * @param m2
+     * @returns {number}
+     */
+    angleBetween: function(m1, m2) {
+        if (m1 === 'h') {
+            m1 = 0;
+        } else if (m1 === 'v') {
+            m1 = Infinity;
+        }
+        if (m2 === 'h') {
+            m2 = 0;
+        } else if (m2 === 'v') {
+            m2 = Infinity;
+        }
+        let angleRadians = Math.atan(Math.abs((m2 - m1) / (1 + (m1 * m2))));
+        return (360 * angleRadians) / (2 * Math.PI);
+    },
+
+    /**
+     * Két egyenes között bezárt szög fokban
      * @param equation1
      * @param equation2
-     * @returns {{x, y: *}|{x, y}|{x: number, y}|boolean|{x: number, y: *}}
+     * @returns {*}
      */
-    calculateIntersection: function(equation1, equation2) {
+    angleBetweenEquations: function(equation1, equation2) {
+        return this.angleBetween(equation1.A, equation2.A);
+    },
+
+    /**
+     * Két egyenes metszéspontja, választható toleranciával
+     * @param equation1
+     * @param equation2
+     * @param toleranceDegrees Fokbeli minimális bezért szög az egyenes vonalba eséshez képest
+     * @returns {{x: number, y: *}|boolean}
+     */
+    calculateIntersection: function(equation1, equation2, toleranceDegrees = null) {
         if (equation1.A === equation2.A) {
             // Párhuzamos egyenesek
             return false;
         }
+
+        let intersection = {};
+
         if (equation1.A === 'v' && equation2.A === 'h') {
             // Függőleges és vízszintes
-            return {
+            intersection = {
                 x: equation1.B,
                 y: equation2.B
             };
-        }
-        if (equation1.A === 'h' && equation2.A === 'v') {
+        } else if (equation1.A === 'h' && equation2.A === 'v') {
             // Vízszintes és függőleges
-            return {
+            intersection = {
                 x: equation2.B,
                 y: equation1.B
-            };
-        }
-        // Innentől az egyik legalább általános
-        if (equation1.A === 'v') {
-            // Függőleges és általános
-            return {
-                x: equation1.B,
-                y: (equation2.A * equation1.B) + equation2.B
-            };
-        }
-        if (equation1.A === 'h') {
-            // Vízszintes és általános
-            return {
-                x: (equation1.B - equation2.B) / equation2.A,
-                y: equation1.B
-            };
-        }
-        if (equation2.A === 'v') {
-            // Függőleges és általános
-            return {
-                x: equation2.B,
-                y: (equation1.A * equation2.B) + equation1.B
-            };
-        }
-        if (equation2.A === 'h') {
-            // Vízszintes és általános
-            return {
-                x: (equation2.B - equation1.B) / equation1.A,
-                y: equation2.B
             };
         }
 
-        // Teljesen általános eset
-        let x = (equation2.B - equation1.B) / (equation1.A - equation2.A);
-        return {
-            x: x,
-            y: (equation1.A * x) + equation1.B
-        };
+        // Innentől az egyik legalább általános
+        else if (equation1.A === 'v') {
+            // Függőleges és általános
+            intersection = {
+                x: equation1.B,
+                y: (equation2.A * equation1.B) + equation2.B
+            };
+        } else if (equation1.A === 'h') {
+            // Vízszintes és általános
+            intersection = {
+                x: (equation1.B - equation2.B) / equation2.A,
+                y: equation1.B
+            };
+        } else if (equation2.A === 'v') {
+            // Függőleges és általános
+            intersection = {
+                x: equation2.B,
+                y: (equation1.A * equation2.B) + equation1.B
+            };
+        } else if (equation2.A === 'h') {
+            // Vízszintes és általános
+            intersection = {
+                x: (equation2.B - equation1.B) / equation1.A,
+                y: equation2.B
+            };
+        } else {
+            // Teljesen általános eset
+            let x = (equation2.B - equation1.B) / (equation1.A - equation2.A);
+            intersection = {
+                x: x,
+                y: (equation1.A * x) + equation1.B
+            };
+        }
+
+        if (Number.isNaN(intersection.x) || Number.isNaN(intersection.y) ) {
+            return false;
+        }
+
+        if (toleranceDegrees) {
+            if (this.angleBetweenEquations(equation1, equation2) < toleranceDegrees) {
+                return false;
+            }
+        }
+
+        return intersection;
+
     },
 
     /**
@@ -230,6 +275,27 @@ svgDraw = {
             x: Math.abs(coordinatesFrom.x + coordinatesTo.x) / 2,
             y: Math.abs(coordinatesFrom.y + coordinatesTo.y) / 2
         };
+    },
+
+    /**
+     * Pont elforgatása egy másik koordináta körül
+     * @param center Középpont
+     * @param angleRad
+     * @param point Pont
+     * @returns {*}
+     */
+    rotatePointAroundCoordinates: function(center, angleRad, point) {
+
+        point.x -= center.x;
+        point.y -= center.y;
+
+        let x = point.x * Math.cos(angleRad) - point.y * Math.sin(angleRad);
+        let y = point.x * Math.sin(angleRad) + point.y * Math.cos(angleRad);
+
+        point.x = x + center.x;
+        point.y = y + center.y;
+
+        return point;
     },
 
     /**
@@ -576,6 +642,35 @@ svgDraw = {
             up: svgDraw.calculateEquation(from.x + thicknessX, from.y - thicknessY, to.x + thicknessX, to.y - thicknessY),
             down: svgDraw.calculateEquation(from.x - thicknessX, from.y + thicknessY, to.x - thicknessX, to.y + thicknessY)
         };
+    },
+
+    /**
+     * Pont merőleges vetülete egyenesen
+     * @param equation
+     * @param point
+     * @returns {{distance: number, x: *, y: (*)}}
+     */
+    projectToEquation: function(equation, point) {
+
+        let perpendicularEquation = this.calculatePerpendicularEquation(equation, point.x, point.y);
+        let projectedPoint = this.calculateIntersection(equation, perpendicularEquation);
+
+        if (projectedPoint) {
+
+            let coordinates = {
+                x: Math.round(projectedPoint.x),
+                y: Math.round(projectedPoint.y)
+            };
+
+            return {
+                coordinates: coordinates,
+                distancePow: this.distancePow(point, projectedPoint)
+            };
+
+        }
+
+        return false;
+
     },
 
     /**

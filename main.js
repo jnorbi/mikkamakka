@@ -522,6 +522,14 @@ window.addEventListener("load", function() {
         backdrop: 'static'
     };
 
+    help('.modal').on('shown.bs.modal', function() {
+        let inputElems = this.getElementsByTagName('input');
+        if (inputElems.length) {
+            inputElems[0].focus();
+            inputElems[0].select();
+        }
+    });
+
     let udvozloModalElement = help('#udvozloModal');
     let bemutatoModalElement = help('#bemutatoModal');
     let ujAlaprajzModalElement = help('#ujAlaprajzModal');
@@ -555,7 +563,6 @@ window.addEventListener("load", function() {
     });
 
     help('#udvozloModal button.btn-outline-primary').on('click', function() {
-
         new bootstrap.Modal(bemutatoModalElement[0], defaultModalOptions).show();
     });
 
@@ -585,6 +592,7 @@ window.addEventListener("load", function() {
     });
 
     help('.alaprajz-letoltese').on('click', function() {
+        floorPlanner.save(1);
 
         let tmpElementId = 'temp-svg-container';
         let tmpIdPrefix = 'tmpsvg-';
@@ -599,6 +607,7 @@ window.addEventListener("load", function() {
             floorPlanner.options.config.wall.tmpWallContainerElementId,
             floorPlanner.options.config.entity.tmpEntityContainerElementId,
             floorPlanner.options.config.debugMode.debugContainerElementId,
+            floorPlanner.options.config.wall.guideContainerElementId,
         ];
 
         let boxGridElement = help('#boxgrid')[0];
@@ -633,10 +642,13 @@ window.addEventListener("load", function() {
         help(tmpElement).addClass('d-none');
         document.body.appendChild(tmpElement);
 
+
+        let watermark = help('#' + tmpIdPrefix + 'icom-logo-image');
+
         // Vízjel
-        help('#' + tmpIdPrefix + 'icom-logo-image').attr('x', realContentDimensions.coordinates.x);
-        help('#' + tmpIdPrefix + 'icom-logo-image').attr('y', realContentDimensions.coordinates.y);
-        help('#' + tmpIdPrefix + 'icom-logo-image').removeClass('d-none');
+        watermark.removeClass('d-none');
+        watermark.attr('x', realContentDimensions.coordinates.x + realContentDimensions.width / 2 - watermark[0].width.baseVal.value / 2);
+        watermark.attr('y', realContentDimensions.coordinates.y + realContentDimensions.height / 2 -  watermark[0].height.baseVal.value / 2);
 
         // Méretezés
         let scale = 2;
@@ -794,6 +806,7 @@ window.addEventListener("load", function() {
     let szobaFeliratok = [
         'egyéb helyiség',
         'előtér',
+        'lépcsőház',
         'étkező',
         'folyosó',
         'fürdőszoba',
@@ -804,7 +817,7 @@ window.addEventListener("load", function() {
         'szoba',
         'kamra',
         'konyha',
-        'lépcsőház',
+        'amerikai konyhás nappali',
         'nappali',
         'padlás',
         'pince',
