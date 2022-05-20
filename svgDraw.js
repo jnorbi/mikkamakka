@@ -217,7 +217,11 @@ svgDraw = {
         }
 
         if (toleranceDegrees) {
-            if (this.angleBetweenEquations(equation1, equation2) < toleranceDegrees) {
+            let angleBetweenEquations = Math.abs(this.angleBetweenEquations(equation1, equation2));
+            if (angleBetweenEquations > 180) {
+                angleBetweenEquations -= 180;
+            }
+            if (angleBetweenEquations < toleranceDegrees) {
                 return false;
             }
         }
@@ -272,8 +276,8 @@ svgDraw = {
      */
     middle: function(coordinatesFrom, coordinatesTo) {
         return {
-            x: Math.abs(coordinatesFrom.x + coordinatesTo.x) / 2,
-            y: Math.abs(coordinatesFrom.y + coordinatesTo.y) / 2
+            x: (coordinatesFrom.x + coordinatesTo.x) / 2,
+            y: (coordinatesFrom.y + coordinatesTo.y) / 2,
         };
     },
 
