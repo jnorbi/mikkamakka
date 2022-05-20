@@ -3,7 +3,8 @@ var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new bootstrap.Tooltip(tooltipTriggerEl);
 });
 
-window.addEventListener("load", function() {
+if (!help('main').hasClass('invisible')) {
+    window.addEventListener("load", function() {
 
     /**
      * FloorPlanner objektum
@@ -584,7 +585,7 @@ window.addEventListener("load", function() {
 
         help('.reset-floorplan').on('click', function() {
             floorPlanner.reset(true);
-        })
+        });
     });
 
     help('#ujAlaprajzModal button.btn-primary').on('click', function() {
@@ -824,7 +825,8 @@ window.addEventListener("load", function() {
         'tároló',
         'tetőtér',
         'wc',
-    ];
+        'erkély',
+    ].sort(new Intl.Collator('hu').compare);
 
     /**
      * Entitásból popover target id
@@ -889,6 +891,38 @@ window.addEventListener("load", function() {
         popovers = [];
 
     };
+    });
+}
+
+help('nav .alaprajz-letoltese').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_download_floorplan', 'action': 'download', 'from': 'main_CTA'});
+});
+help('#ujAlaprajzModal .alaprajz-letoltese').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_download_floorplan', 'action': 'download', 'from': 'new_floorplan_popup'});
+});
+help('.erdekel-a-bemutato').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_intro_popup', 'action': 'show_intro_button_click'});
+});
+help('.uj-alaprajzot-keszitek-start').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_intro_popup', 'action': 'new_floorplan_button_click'});
+});
+help('.kezdhetjuk').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_start_floorplan', 'action': 'start_button_click'});
+});
+help('#ujAlaprajzModal').on('shown.bs.modal', function() {
+    dataLayer.push({'event': 'floor_planner_new_floorplan', 'action': 'open_popup'});
+});
+help('#ujAlaprajzModal').on('hidden.bs.modal', function() {
+    dataLayer.push({'event': 'floor_planner_new_floorplan', 'action': 'close_popup'});
+});
+help('.uj-alaprajzot-keszitek').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_new_floorplan', 'action': 'new_floorplan_button_click'});
+});
+help('nav .bejelentkezes-regisztracio').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_header', 'action': 'click', 'name': 'loginOrRegister'});
+});
+help('nav .hirdetesfeladas').on('click', function() {
+    dataLayer.push({'event': 'floor_planner_header', 'action': 'click', 'name': 'postListing'});
 });
 
 function setCookie(name, value, days) {
